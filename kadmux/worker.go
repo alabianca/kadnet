@@ -35,7 +35,7 @@ func (w *Worker) Start(queue chan chan WorkRequest) {
 
 		select {
 		case work := <-w.Work:
-			work.Handler(work.ArgConn, work.ArgRequest)
+			work.Handler.Handle(work.ArgConn, work.ArgRequest)
 		case <-w.exit:
 			log.Printf("Exit Worker %d\n", w.id)
 			return

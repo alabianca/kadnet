@@ -17,6 +17,7 @@ type KademliaMessage interface {
 	Bytes() ([]byte, error)
 	GetRandomID() string
 	GetSenderID() string
+	GetEchoRandomID() string
 }
 
 const (
@@ -178,7 +179,6 @@ func IsValid(msgType MessageType) bool {
 
 func IsResponse(msgType MessageType) bool {
 	return msgType == FindNodeRes ||
-		msgType == PingRes ||
 		msgType == FindValueRes ||
 		msgType == StoreRes
 }
@@ -187,7 +187,8 @@ func IsRequest(msgType MessageType) bool {
 	return msgType == FindNodeReq ||
 		msgType == PingReq ||
 		msgType == FindValueReq ||
-		msgType == StoreReq
+		msgType == StoreReq ||
+		msgType == PingRes
 }
 
 func SerializeID(id string) ([]byte, error) {

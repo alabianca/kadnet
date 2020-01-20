@@ -56,6 +56,10 @@ func (n *FindNodeResponse) GetSenderID() string {
 	return n.SenderID
 }
 
+func (n *FindNodeResponse) GetEchoRandomID() string {
+	return n.EchoRandomID
+}
+
 // FIND NODE REQUEST
 
 type FindNodeRequest struct {
@@ -118,4 +122,8 @@ func (n *FindNodeRequest) GetRandomID() string {
 
 func (n *FindNodeRequest) GetSenderID() string {
 	return n.SenderID
+}
+
+func (n *FindNodeRequest) GetEchoRandomID() string {
+	return n.EchoRandomID
 }

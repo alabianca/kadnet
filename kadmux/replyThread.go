@@ -63,6 +63,9 @@ func (r *ReplyThread) Run(newWork chan<- WorkRequest, exit <-chan chan error) {
 func (r *ReplyThread) tempStoreMsg(km messages.Message) {
 	key, _ := km.MultiplexKey()
 	buf := r.getBuffer(key)
+	if buf == nil {
+		return
+	}
 
 	writer := buf.NewWriter()
 	writer.Write(km)

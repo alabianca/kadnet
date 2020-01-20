@@ -9,10 +9,8 @@ import (
 	"log"
 )
 
-func onFindNode(proxy *dhtProxy) kadmux.RpcHandler {
+func onFindNode(proxy *dhtProxy) kadmux.RpcHandlerFunc {
 	return func(conn kadconn.KadWriter, req *request.Request) {
-		mux, _ := req.Body.MultiplexKey()
-		senderID, _ := req.Body.SenderID()
 		randomId, _ := req.Body.RandomID()
 		payload, _ := req.Body.Payload()
 
@@ -24,12 +22,6 @@ func onFindNode(proxy *dhtProxy) kadmux.RpcHandler {
 			Payload:      contacts,
 			RandomID:     gokad.GenerateRandomID().String(),
 		}
-		log.Printf("%d: (%s)  RandomID: (%s) Payload: (%s) Size: (%d)\n",
-			mux,
-			senderID.String(),
-			gokad.ID(randomId).String(),
-			gokad.ID(payload).String(),
-			len(req.Body))
 
 		bts, err := res.Bytes()
 		if err != nil {
@@ -38,5 +30,11 @@ func onFindNode(proxy *dhtProxy) kadmux.RpcHandler {
 		}
 
 		conn.Write(bts, req.Address())
+	}
+}
+
+func onPingReply(proxy *dhtProxy) kadmux.RpcHandlerFunc {
+	return func(conn kadconn.KadWriter, req *request.Request) {
+		log.Println("Received a ping reply")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/alabianca/gokad"
 	"net"
 	"testing"
+	"time"
 )
 
 
@@ -99,6 +100,28 @@ func TestNodeLookup_Nested(t *testing.T) {
 	if count != max {
 		t.Fatalf("Expected %d nodes in the routing table, but got %d\n", max, count)
 	}
+}
+
+func TestPingReply(t *testing.T) {
+	node1 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5002 })
+	go node1.Listen(nil)
+	go node2.Listen(nil)
+	defer func() {
+		shutdown(node1)
+		shutdown(node2)
+	}()
+
+	node2.Seed(gokad.Contact{
+		ID:   node1.ID(),
+		IP:   net.ParseIP(node1.Host),
+		Port: node1.Port,
+	})
+
+	<-node2.started
+	node2.Lookup(node2.ID())
+
+	time.Sleep(time.Second * 5)
 }
 
 func shutdown(nodes ...*Node) {

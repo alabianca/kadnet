@@ -9,6 +9,7 @@ import (
 	"github.com/alabianca/kadnet/messages"
 	"github.com/alabianca/kadnet/response"
 	"net"
+	"os"
 	"strconv"
 	"time"
 )
@@ -33,13 +34,13 @@ type Node struct {
 
 func NewNode(dht *gokad.DHT, configs ...NodeConfig) *Node {
 	n := &Node{
-		dht:     newDhtProxy(dht),
-		K: 20,
-		Alpha: 3,
+		dht:          newDhtProxy(dht),
+		K:            20,
+		Alpha:        3,
 		RoundTimeout: time.Second * 3,
-		Host: "127.0.0.1",
-		Port: 5000,
-		started: make(chan bool, 1),
+		Host:         "127.0.0.1",
+		Port:         5000,
+		started:      make(chan bool, 1),
 	}
 
 	for _, config := range configs {
@@ -176,7 +177,6 @@ func (n *Node) Lookup(id gokad.ID) error {
 		next = make([]*pendingNode, concurrency)
 	}
 
-
 	return nil
 
 }
@@ -196,7 +196,12 @@ func (n *Node) getBuffer(key string) buffers.Buffer {
 }
 
 func (n *Node) registerRequestHandlers() {
+	n.mux.Use(
+		kadmux.Logging(os.Stdout),
+		kadmux.ExpectPingReply(n.getBuffer(kadmux.PingReplyBufferID)),
+	)
 	n.mux.HandleFunc(messages.FindNodeReq, onFindNode(n.dht))
+	n.mux.HandleFunc(messages.PingRes, onPingReply(n.dht))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {

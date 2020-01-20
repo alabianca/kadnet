@@ -11,11 +11,13 @@ import (
 
 const HandlerNotFoundErr = "Handler Not Found"
 const NodeReplyBufferID = "NodeReplyBuffer"
+const PingReplyBufferID = "PingReplyBuffer"
 
 type Mux interface {
 	Handle(c kadconn.KadConn) error
-	HandleFunc(m messages.MessageType, handler RpcHandler)
+	HandleFunc(m messages.MessageType, handler RpcHandlerFunc)
 	GetBuffer(keystring string) buffers.Buffer
+	Use(middlewares ...func(handler RpcHandler) RpcHandler)
 	Close()
 }
 
@@ -24,12 +26,11 @@ type RemoteMessage interface {
 	Address() net.Addr
 }
 
-type RpcHandler func(conn kadconn.KadWriter, req *request.Request)
-
 type kadMux struct {
-	conn       kadconn.KadConn
-	handlers   map[messages.MessageType]RpcHandler
-	dispatcher *Dispatcher
+	conn        kadconn.KadConn
+	handlers    map[messages.MessageType]RpcHandler
+	middlewares []func(handler RpcHandler) RpcHandler
+	dispatcher  *Dispatcher
 	// channels
 	dispatchRequest chan WorkRequest
 	onResponse      chan messages.Message
@@ -49,6 +50,7 @@ func NewMux() Mux {
 		stopDispatcher:  make(chan bool),
 		dispatchRequest: make(chan WorkRequest),
 		handlers:        make(map[messages.MessageType]RpcHandler),
+		middlewares:     make([]func(handler RpcHandler) RpcHandler, 0),
 		onRequest:       make(chan *request.Request),
 		onResponse:      make(chan messages.Message),
 		exit:            make(chan error),
@@ -56,6 +58,10 @@ func NewMux() Mux {
 			NodeReplyBufferID: buffers.NewNodeReplyBuffer(),
 		},
 	}
+}
+
+func (k *kadMux) Use(middlewares ...func(handler RpcHandler) RpcHandler) {
+	k.middlewares = append(k.middlewares, middlewares...)
 }
 
 func (k *kadMux) GetBuffer(key string) buffers.Buffer {
@@ -134,6 +140,20 @@ func (k *kadMux) handleRequests() {
 	}
 }
 
-func (k *kadMux) HandleFunc(m messages.MessageType, handler RpcHandler) {
-	k.handlers[m] = handler
+func (k *kadMux) HandleFunc(m messages.MessageType, handler RpcHandlerFunc) {
+
+	k.handlers[m] = k.handle(handler)
+}
+
+func (k *kadMux) handle(handler RpcHandler) RpcHandler {
+	if len(k.middlewares) == 0 {
+		return handler
+	}
+
+	h := k.middlewares[len(k.middlewares) - 1](handler)
+	for i := len(k.middlewares) -2; i >= 0; i-- {
+		h = k.middlewares[i](h)
+	}
+
+	return h
 }

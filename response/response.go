@@ -10,17 +10,18 @@ import (
 )
 
 type Response struct {
-	Contact     gokad.Contact
-	Body        buffers.Buffer
-	matcher     string
-	readTimeout time.Duration
+	Contact        gokad.Contact
+	Body           buffers.Buffer
+	SendPingReplyFunc func(echoRandomID string)
+	matcher        string
+	readTimeout    time.Duration
 }
 
-func New(c gokad.Contact, matcher string, reader buffers.Buffer) *Response {
+func New(c gokad.Contact, matcher string, buffer buffers.Buffer) *Response {
 	return &Response{
-		Contact: c,
-		Body:    reader,
-		matcher: matcher,
+		Contact:        c,
+		Body:           buffer,
+		matcher:        matcher,
 	}
 }
 
@@ -45,8 +46,15 @@ func (r *Response) Read(km messages.KademliaMessage) (int, error) {
 	if r.readTimeout != time.Duration(0) {
 		reader.SetDeadline(r.readTimeout)
 	}
-	return reader.Read(km)
+	n, err := reader.Read(km)
+
+	if err == nil && r.SendPingReplyFunc != nil {
+		r.SendPingReplyFunc(km.GetEchoRandomID())
+	}
+
+	return n, err
 }
+
 
 func (r *Response) resetTimeout() {
 	r.readTimeout = time.Duration(0)

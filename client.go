@@ -31,6 +31,12 @@ func (c *Client) FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.R
 	c.do(req)
 
 	res := response.New(contact, fnr.RandomID, c.NodeReplyBuffer)
+	res.SendPingReplyFunc = func(echoRandomID string) {
+		pingRes := messages.PingResponse{SenderID: c.ID.String(), RandomID: gokad.GenerateRandomID().String(), EchoRandomID: echoRandomID }
+		if b, err := pingRes.Bytes(); err == nil {
+			c.Writer.Write(b, req.Address())
+		}
+	}
 
 	return res, nil
 }
@@ -38,3 +44,4 @@ func (c *Client) FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.R
 func (c *Client) do(req *request.Request) {
 	go c.Writer.Write(req.Body, req.Address())
 }
+
