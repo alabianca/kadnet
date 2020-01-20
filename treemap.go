@@ -6,23 +6,23 @@ import (
 	"github.com/alabianca/gokad"
 )
 
-type CompareFunc func(a gokad.Distance, b gokad.Distance) int //GENERIC
-type TraverseFunc func(k gokad.Distance, v PendingNode) bool // GENERIC
+type compareFunc func(a gokad.Distance, b gokad.Distance) int //GENERIC
+type traverseFunc func(k gokad.Distance, v *pendingNode) bool // GENERIC
 
-// TreeMap implementation
+// treeMap implementation
 
-type TreeMap struct {
+type treeMap struct {
 	root *node
-	comp CompareFunc
+	comp compareFunc
 }
 
-func NewMap(compFn CompareFunc) *TreeMap {
-	return &TreeMap{
+func newMap(compFn compareFunc) *treeMap {
+	return &treeMap{
 		comp: compFn,
 	}
 }
 
-func (t *TreeMap) Insert(key gokad.Distance, data PendingNode) bool { // GENERIC
+func (t *treeMap) Insert(key gokad.Distance, data *pendingNode) bool { // GENERIC
 	if t.root == nil {
 		t.root = newNode(nil, t.comp, false, key, data)
 		t.root.insertFixup(t.root)
@@ -38,11 +38,11 @@ func (t *TreeMap) Insert(key gokad.Distance, data PendingNode) bool { // GENERIC
 	return false
 }
 
-func (t *TreeMap) Get(key gokad.Distance) (PendingNode, bool) { // GENERIC
-	var d PendingNode
+func (t *treeMap) Get(key gokad.Distance) (*pendingNode, bool) { // GENERIC
+	var d *pendingNode
 	var ok bool
 
-	t.Traverse(func(k gokad.Distance, v PendingNode) bool { // GENERIC
+	t.Traverse(func(k gokad.Distance, v *pendingNode) bool { // GENERIC
 		if t.comp(k, key) == 0 {
 			ok = true
 			d = v
@@ -55,9 +55,9 @@ func (t *TreeMap) Get(key gokad.Distance) (PendingNode, bool) { // GENERIC
 	return d, ok
 }
 
-func (t TreeMap) String() string {
+func (t treeMap) String() string {
 	buf := new(bytes.Buffer)
-	t.Traverse(func(k gokad.Distance, v PendingNode) bool { // GENERIC
+	t.Traverse(func(k gokad.Distance, v *pendingNode) bool { // GENERIC
 		buf.WriteString(fmt.Sprintf("%v(%v)->", k, v))
 		return true
 	})
@@ -65,15 +65,15 @@ func (t TreeMap) String() string {
 	return buf.String()
 }
 
-func (t *TreeMap) Traverse(proj TraverseFunc) {
+func (t *treeMap) Traverse(proj traverseFunc) {
 	t.traverse(t.root, proj)
 }
 
-func (t *TreeMap) TraverseBF(proj TraverseFunc) {
+func (t *treeMap) TraverseBF(proj traverseFunc) {
 	t.traverseBF(t.root, proj)
 }
 
-func (t *TreeMap) traverseBF(n *node, proj TraverseFunc) {
+func (t *treeMap) traverseBF(n *node, proj traverseFunc) {
 	if n == nil {
 		return
 	}
@@ -98,7 +98,7 @@ func (t *TreeMap) traverseBF(n *node, proj TraverseFunc) {
 	}
 }
 
-func (t *TreeMap) traverse(n *node, proj TraverseFunc) {
+func (t *treeMap) traverse(n *node, proj traverseFunc) {
 	if n == nil {
 		return
 	}
@@ -115,7 +115,7 @@ func (t *TreeMap) traverse(n *node, proj TraverseFunc) {
 // Node Implementation. Everything must be private at this point
 type nodeData struct { // GENERIC
 	key  gokad.Distance
-	data PendingNode
+	data *pendingNode
 }
 
 type node struct {
@@ -125,11 +125,11 @@ type node struct {
 	left        *node
 	parent      *node
 	data        nodeData
-	comp        CompareFunc
+	comp        compareFunc
 }
 
 // GENERIC
-func newNode(parent *node, c CompareFunc, isLeftChild bool, key gokad.Distance, data PendingNode) *node {
+func newNode(parent *node, c compareFunc, isLeftChild bool, key gokad.Distance, data *pendingNode) *node {
 	return &node{
 		black:       false, // a node is always inserted red
 		isLeftChild: isLeftChild,
@@ -145,7 +145,7 @@ func newNode(parent *node, c CompareFunc, isLeftChild bool, key gokad.Distance, 
 }
 
 // GENERIC
-func (n *node) insert(key gokad.Distance, data PendingNode) *node {
+func (n *node) insert(key gokad.Distance, data *pendingNode) *node {
 	addedNode := n.insertSimple(key, data)
 	if addedNode != nil {
 		return n.insertFixup(addedNode)
@@ -155,7 +155,7 @@ func (n *node) insert(key gokad.Distance, data PendingNode) *node {
 }
 
 // GENERIC
-func (n *node) insertSimple(key gokad.Distance, data PendingNode) *node {
+func (n *node) insertSimple(key gokad.Distance, data *pendingNode) *node {
 	res := n.comp(n.data.key, key)
 	if res < 0 {
 		if n.left != nil {

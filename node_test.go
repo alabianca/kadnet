@@ -2,39 +2,40 @@ package kadnet
 
 import (
 	"github.com/alabianca/gokad"
-	"github.com/alabianca/kadnet/kadmux"
 	"net"
 	"testing"
 )
 
+
 func TestNodeLookup_Basic(t *testing.T) {
 	passive := make([]*Node, 10)
-	for i := 0; i < 10; i++ {
-		port := 5000 + i
-		passive[i] = NewNode(gokad.NewDHT(), "127.0.0.1", port)
-		go func(node *Node) {
-			node.Listen(nil)
-		}(passive[i])
+
+	for i := 0; i < len(passive); i++ {
+		config := func(n *Node) {
+			n.Port = 5000 + i
+		}
+
+		passive[i] = NewNode(gokad.NewDHT(), config)
+		go passive[i].Listen(nil)
 	}
 
-	bootstrapNode := NewNode(gokad.NewDHT(), "127.0.0.1", 6000)
+	bootstrapNode := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 6000 })
+	go bootstrapNode.Listen(nil)
+
 	for _, n := range passive {
 		bootstrapNode.Seed(gokad.Contact{
-			ID:   n.dht.getOwnID(),
-			IP:   net.ParseIP(n.host),
-			Port: n.port,
+			ID:   n.ID(),
+			IP:   net.ParseIP(n.Host),
+			Port: n.Port,
 		})
 	}
 
-	go func() {
-		bootstrapNode.Listen(nil)
-	}()
-
-	joining := NewNode(gokad.NewDHT(), "", 7000)
+	joining := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 7000 })
+	go joining.Listen(nil)
 	joining.Seed(gokad.Contact{
-		ID:   bootstrapNode.dht.getOwnID(),
-		IP:   net.ParseIP(bootstrapNode.host),
-		Port: bootstrapNode.port,
+		ID:   bootstrapNode.ID(),
+		IP:   net.ParseIP(bootstrapNode.Host),
+		Port: bootstrapNode.Port,
 	})
 
 	defer func() {
@@ -43,77 +44,61 @@ func TestNodeLookup_Basic(t *testing.T) {
 		shutdown(joining)
 	}()
 
-	go func() {
-		joining.Listen(nil)
-	}()
-
 	<-bootstrapNode.started
 	<-joining.started
-	config := func(n *NodeLookup) {
-		n.LookupID = joining.dht.getOwnID()
-		n.Alpha = joining.dht.getAlphaNodes(3, n.LookupID)
-		n.Rpc = joining.NewClient()
-		n.NodeReplyBuffer = joining.GetBuffer(kadmux.NodeReplyBufferID)
+
+	err := joining.Lookup(joining.ID())
+	if err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
 
-	nodeLookup := NewNodeLookup(config)
+	var count int
+	joining.Walk(func(index int, c gokad.Contact) {
+		count++
+	})
 
-	cs := Lookup(nodeLookup)
-
-	if len(cs) != len(passive) + 1 {
-		t.Fatalf("Expected %d to be returned but got %d\n", len(passive) + 1, len(cs))
+	if count != len(passive) + 1 {
+		t.Fatalf("Expected %d contacts in the routing table, but got %d\n", len(passive) + 1, count)
 	}
-
 }
 
 func TestNodeLookup_Nested(t *testing.T) {
-	node1 := NewNode(gokad.NewDHT(), "127.0.0.1", 5000)
-	node2 := NewNode(gokad.NewDHT(), "127.0.0.1", 5001)
-	node3 := NewNode(gokad.NewDHT(), "127.0.0.1", 5002)
-	node4 := NewNode(gokad.NewDHT(), "127.0.0.1", 5003)
+	nodes := make([]*Node, 0)
+	max := 20
+	for i := 0; i <= max; i++ {
+		node := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5000 + i})
+		nodes = append(nodes, node)
 
-	nodes := []*Node{node1, node2, node3, node4}
+		if i > 0 {
+			node.Seed(gokad.Contact{
+				ID:   nodes[i-1].ID(),
+				IP:   net.ParseIP(nodes[i-1].Host),
+				Port: nodes[i-1].Port,
+			})
+		}
 
-	node2.Seed(gokad.Contact{
-		ID:   node1.dht.getOwnID(),
-		IP:   net.ParseIP(node1.host),
-		Port: node1.port,
-	})
-
-	node3.Seed(gokad.Contact{
-		ID:   node2.dht.getOwnID(),
-		IP:   net.ParseIP(node1.host),
-		Port: node2.port,
-	})
-
-	node4.Seed(gokad.Contact{
-		ID:   node3.dht.getOwnID(),
-		IP:   net.ParseIP(node3.host),
-		Port: node3.port,
-	})
-
-	for _, n := range nodes {
-		go n.Listen(nil)
+		go func(n *Node) {
+			n.Listen(nil)
+		}(node)
 	}
 
 	defer shutdown(nodes...)
 
-	<-node4.started
-	config := func(n *NodeLookup) {
-		n.LookupID = node4.dht.getOwnID()
-		n.Alpha = node4.dht.getAlphaNodes(3, n.LookupID)
-		n.Rpc = node4.NewClient()
-		n.NodeReplyBuffer = node4.GetBuffer(kadmux.NodeReplyBufferID)
+
+	joining := nodes[len(nodes) - 1]
+	<- joining.started
+	if err := joining.Lookup(joining.ID()); err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
 
-	lookup := NewNodeLookup(config)
+	var count int
+	joining.Walk(func(index int, c gokad.Contact) {
+		count++
+	})
 
-	cs := Lookup(lookup)
-
-	if len(cs) != 3 {
-		t.Fatalf("Expected %d nodes, but got %d\n", 3, len(cs))
+	if count != max {
+		t.Fatalf("Expected %d nodes in the routing table, but got %d\n", max, count)
 	}
-
 }
 
 func shutdown(nodes ...*Node) {
