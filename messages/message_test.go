@@ -88,6 +88,33 @@ func TestMessageX_FindNodeResponse(t *testing.T) {
 
 }
 
+func TestPingResponse_Bytes(t *testing.T) {
+	sid := gokad.GenerateRandomID()
+	eid := gokad.GenerateRandomID()
+	rid := gokad.GenerateRandomID()
+	prb := messages.PingResponse{
+		SenderID:     sid.String(),
+		EchoRandomID: eid.String(),
+		RandomID:     rid.String(),
+	}
+
+	b, _ := prb.Bytes()
+	msg := messages.Message(b)
+
+	if id, _ := msg.SenderID(); !reflect.DeepEqual(sid, id) {
+		t.Fatalf("Expected sender id to be %s, but got %s", sid, id)
+	}
+
+	if id, _ := msg.EchoRandomID(); !reflect.DeepEqual(eid, gokad.ID(id)) {
+		t.Fatalf("Expected echo id to be %s, but got %s", eid, id)
+	}
+
+	if id, _ := msg.RandomID(); !reflect.DeepEqual(rid, gokad.ID(id)) {
+		t.Fatalf("Expected random id to be %s, but got %s", rid, id)
+	}
+
+}
+
 func generateContact(id string) gokad.Contact {
 	x, _ := gokad.From(id)
 	return gokad.Contact{

@@ -31,6 +31,7 @@ func (c *Client) FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.R
 	c.do(req)
 
 	res := response.New(contact, fnr.RandomID, c.NodeReplyBuffer)
+	// When the response is successfully read, send the appropriate PingReply
 	res.SendPingReplyFunc = func(echoRandomID string) {
 		pingRes := messages.PingResponse{SenderID: c.ID.String(), RandomID: gokad.GenerateRandomID().String(), EchoRandomID: echoRandomID }
 		if b, err := pingRes.Bytes(); err == nil {

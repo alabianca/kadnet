@@ -56,6 +56,7 @@ func NewMux() Mux {
 		exit:            make(chan error),
 		buffers: map[string]buffers.Buffer{
 			NodeReplyBufferID: buffers.NewNodeReplyBuffer(),
+			PingReplyBufferID: buffers.NewPingReplyBuffer(),
 		},
 	}
 }
@@ -80,18 +81,29 @@ func (k *kadMux) Close() {
 		<-stopRec
 		k.stopDispatcher <- true
 		k.exit <- nil
+		// close all buffers
+		for _, v := range k.buffers {
+			v.Close()
+		}
 	}
 }
 
+// Handle the connection and start the request dispatcher, receiverThread and replyThread
+// We also open all buffers that remain open through the lifetime of the mux
 func (k *kadMux) Handle(conn kadconn.KadConn) error {
 	k.conn = conn
 	k.startDispatcher(10) // @todo get max workers from somewhere else
 	receiver := NewReceiverThread(k.onResponse, k.onRequest, k.conn)
 	reply := NewReplyThread(k.onResponse, k.onRequest, k.conn)
 
+	// store the buffers in the reply thread so we can buffer incoming responses
+	// requests are not buffered and are handled by the dispatcher
 	for _, v := range k.buffers {
 		reply.SetBuffers(v)
 	}
+
+	k.buffers[PingReplyBufferID].Open()
+
 
 	k.stopReceiver = make(chan chan error)
 	k.stopReply = make(chan chan error)

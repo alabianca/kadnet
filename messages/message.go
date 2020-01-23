@@ -42,7 +42,7 @@ func (m Message) EchoRandomID() ([]byte, error) {
 	}
 
 	out := make([]byte, 20)
-	copy(out, m[21:42])
+	copy(out, m[21:41])
 
 	return out, nil
 }

@@ -13,8 +13,15 @@ type Request struct {
 }
 
 func New(c gokad.Contact, body messages.Message) *Request {
+	idc := make(gokad.ID, len(c.ID))
+	copy(idc, c.ID)
+	contact := gokad.Contact{
+		ID:   idc,
+		IP:   c.IP,
+		Port: c.Port,
+	}
 	return &Request{
-		Contact: c,
+		Contact: contact,
 		Body:    body,
 	}
 }

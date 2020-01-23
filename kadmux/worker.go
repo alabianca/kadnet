@@ -3,7 +3,6 @@ package kadmux
 import (
 	"github.com/alabianca/kadnet/kadconn"
 	"github.com/alabianca/kadnet/request"
-	"log"
 )
 
 type WorkRequest struct {
@@ -37,7 +36,6 @@ func (w *Worker) Start(queue chan chan WorkRequest) {
 		case work := <-w.Work:
 			work.Handler.Handle(work.ArgConn, work.ArgRequest)
 		case <-w.exit:
-			log.Printf("Exit Worker %d\n", w.id)
 			return
 
 		}

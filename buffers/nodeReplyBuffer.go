@@ -77,6 +77,9 @@ func (n *NodeReplyBuffer) Open() {
 }
 
 func (n *NodeReplyBuffer) Close() {
+	if !n.IsOpen() {
+		return
+	}
 	n.active = false
 	n.exit <- true
 	n.getMessage = nil

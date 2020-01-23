@@ -125,6 +125,8 @@ func (n *Node) Lookup(id gokad.ID) error {
 	if nodeReplyBuffer == nil {
 		return errors.New("cannot open Node Reply Buffer <nil>")
 	}
+	// the nodeReplyBuffer must be opened
+	// once opened it is ready to receive answers to FIND_NODE_RPC's
 	nodeReplyBuffer.Open()
 	defer nodeReplyBuffer.Close()
 
@@ -196,12 +198,15 @@ func (n *Node) getBuffer(key string) buffers.Buffer {
 }
 
 func (n *Node) registerRequestHandlers() {
+	// register middlewares
+	pingReplyBuffer := n.getBuffer(kadmux.PingReplyBufferID)
 	n.mux.Use(
-		kadmux.Logging(os.Stdout),
-		kadmux.ExpectPingReply(n.getBuffer(kadmux.PingReplyBufferID)),
+		kadmux.Logging(os.Stdout),                                     // Log requests to stdout
+		kadmux.ExpectPingReply(pingReplyBuffer), // write the expected PingReplyMessage to the buffer
 	)
+	// handlers to run after middlewares executed
 	n.mux.HandleFunc(messages.FindNodeReq, onFindNode(n.dht))
-	n.mux.HandleFunc(messages.PingRes, onPingReply(n.dht))
+	n.mux.HandleFunc(messages.PingRes, onPingReply(n.dht, pingReplyBuffer))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {

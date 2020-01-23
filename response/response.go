@@ -12,6 +12,8 @@ import (
 type Response struct {
 	Contact        gokad.Contact
 	Body           buffers.Buffer
+	// SendPingReplyFunc is called whenever a response is successfully
+	// read in Response.Read
 	SendPingReplyFunc func(echoRandomID string)
 	matcher        string
 	readTimeout    time.Duration

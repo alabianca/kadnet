@@ -25,7 +25,7 @@ type RpcHandler interface {
 // PingResponse after we responded.
 // This middleware creates the PingReplyMessage we expect to receive
 // based on the request's EchoRandomId. We then store
-// the echoRandomId in the provided buffer.
+// the expected PingReplyMessage in the provided buffer.
 func ExpectPingReply(buffer buffers.Buffer) func(next RpcHandler) RpcHandler {
 	return func(next RpcHandler) RpcHandler {
 		fn := func(conn kadconn.KadWriter, req *request.Request) {
@@ -34,7 +34,18 @@ func ExpectPingReply(buffer buffers.Buffer) func(next RpcHandler) RpcHandler {
 				next.Handle(conn, req)
 				return
 			}
+			
+			writer := buffer.NewWriter()
+			sid, _ := req.Body.SenderID()
+			rid, _ := req.Body.RandomID()
+			pingReply := messages.PingResponse{
+				SenderID:     sid.String(),
+				EchoRandomID: gokad.ID(rid).String(),
+				RandomID:     gokad.GenerateRandomID().String(),
+			}
 
+			b, _ := pingReply.Bytes()
+			writer.Write(b)
 
 			next.Handle(conn, req)
 		}

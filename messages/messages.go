@@ -89,6 +89,12 @@ func ToKademliaMessage(msg Message, km KademliaMessage) {
 	p, _ := msg.Payload()
 
 	switch v := km.(type) {
+	case *PingResponse:
+		*v = PingResponse{
+			SenderID:     ToStringId(sid),
+			EchoRandomID: ToStringId(eid),
+			RandomID:     ToStringId(rid),
+		}
 	case *FindNodeRequest:
 		*v = FindNodeRequest{
 			RandomID:     ToStringId(rid),

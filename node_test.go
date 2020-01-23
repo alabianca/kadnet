@@ -3,6 +3,7 @@ package kadnet
 import (
 	"github.com/alabianca/gokad"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -121,7 +122,22 @@ func TestPingReply(t *testing.T) {
 	<-node2.started
 	node2.Lookup(node2.ID())
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Millisecond * 500)
+
+	var c gokad.Contact
+	var count int
+	node1.Walk(func(index int, contact gokad.Contact) {
+		c = contact
+		count++
+	})
+
+	if count != 1 {
+		t.Fatalf("Expected 1 contact, but got %d\n", count)
+	}
+
+	if !reflect.DeepEqual(c.ID, node2.ID()) {
+		t.Fatalf("Expected ids to be equal, but got %s\n", c.ID)
+	}
 }
 
 func shutdown(nodes ...*Node) {

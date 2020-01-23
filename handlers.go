@@ -2,6 +2,7 @@ package kadnet
 
 import (
 	"github.com/alabianca/gokad"
+	"github.com/alabianca/kadnet/buffers"
 	"github.com/alabianca/kadnet/kadconn"
 	"github.com/alabianca/kadnet/kadmux"
 	"github.com/alabianca/kadnet/messages"
@@ -33,8 +34,33 @@ func onFindNode(proxy *dhtProxy) kadmux.RpcHandlerFunc {
 	}
 }
 
-func onPingReply(proxy *dhtProxy) kadmux.RpcHandlerFunc {
+func onPingReply(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandlerFunc {
 	return func(conn kadconn.KadWriter, req *request.Request) {
-		log.Println("Received a ping reply")
+		// find the pingReplyMessage in the buffer
+		id, err := req.Body.EchoRandomID()
+		if err != nil {
+			return
+		}
+		sid, err := req.Body.SenderID()
+		if err != nil {
+			return
+		}
+
+		key := gokad.ID(id).String()
+		reader := buffer.NewReader(key)
+
+		var prm messages.PingResponse
+		if _, err := reader.Read(&prm); err != nil {
+			return
+		}
+
+		if prm.EchoRandomID != key || prm.SenderID != sid.String() {
+			return
+		}
+
+		// they match. Let's attempt to insert contact to our dht
+		proxy.insert(req.Contact)
+
+
 	}
 }
