@@ -22,15 +22,16 @@ type KademliaMessage interface {
 
 const (
 	// Message Types
-	NodeLookup   = MessageType(30)
-	FindNodeReq  = MessageType(20)
-	FindNodeRes  = MessageType(21)
-	PingReq      = MessageType(22)
-	PingRes      = MessageType(23)
-	FindValueReq = MessageType(24)
-	FindValueRes = MessageType(25)
-	StoreReq     = MessageType(26)
-	StoreRes     = MessageType(27)
+	NodeLookup      = MessageType(30)
+	FindNodeReq     = MessageType(20)
+	FindNodeRes     = MessageType(21)
+	PingReq         = MessageType(22)
+	PingResImplicit = MessageType(23) // sent automatically after reading every response to a request
+	PingResExplicit = MessageType(24) // sent explicitly as a response to a PingRequest
+	FindValueReq    = MessageType(25)
+	FindValueRes    = MessageType(26)
+	StoreReq        = MessageType(27)
+	StoreRes        = MessageType(28)
 	// Message Sizes
 	PingReqSize      = 41
 	PingResSize      = 41
@@ -59,7 +60,7 @@ func GetMessageSize(x MessageType) int {
 		size = FindValueResSize
 	case PingReq:
 		size = PingReqSize
-	case PingRes:
+	case PingResImplicit:
 		size = PingResSize
 	case StoreReq:
 		size = StoreReqSize
@@ -186,7 +187,8 @@ func IsValid(msgType MessageType) bool {
 func IsResponse(msgType MessageType) bool {
 	return msgType == FindNodeRes ||
 		msgType == FindValueRes ||
-		msgType == StoreRes
+		msgType == StoreRes ||
+		msgType == PingResExplicit
 }
 
 func IsRequest(msgType MessageType) bool {
@@ -194,7 +196,7 @@ func IsRequest(msgType MessageType) bool {
 		msgType == PingReq ||
 		msgType == FindValueReq ||
 		msgType == StoreReq ||
-		msgType == PingRes
+		msgType == PingResImplicit
 }
 
 func SerializeID(id string) ([]byte, error) {

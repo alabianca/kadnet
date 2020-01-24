@@ -115,6 +115,18 @@ func TestPingResponse_Bytes(t *testing.T) {
 
 }
 
+func TestExplicitAndImplicitPingRes(t *testing.T) {
+	implicit := messages.Implicit()
+	if key := implicit.MultiplexKey(); key != messages.PingResImplicit {
+		t.Fatalf("Expected Multiplex Key to be %d, but got %d\n", messages.PingResImplicit, key)
+	}
+
+	explicit := messages.Explicit()
+	if key := explicit.MultiplexKey(); key != messages.PingResExplicit {
+		t.Fatalf("Expected Multiplex key to be %d, but got %d\n", messages.PingResExplicit, key)
+	}
+}
+
 func generateContact(id string) gokad.Contact {
 	x, _ := gokad.From(id)
 	return gokad.Contact{

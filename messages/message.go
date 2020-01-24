@@ -32,8 +32,9 @@ func (m Message) SenderID() (gokad.ID, error) {
 func (m Message) EchoRandomID() ([]byte, error) {
 	key, _ := m.MultiplexKey()
 	// a request generally does not have an echoRandomID.
-	// however a pingRes does have one even though it is considered a request type
-	if IsRequest(key) && key != PingRes {
+	// however a pingRes that was sent implicitly (as a result of piggy backing a response)
+	// it will have an echo random ID
+	if IsRequest(key) && key != PingResImplicit {
 		return []byte{}, nil
 	}
 

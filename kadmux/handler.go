@@ -30,7 +30,7 @@ func ExpectPingReply(buffer buffers.Buffer) func(next RpcHandler) RpcHandler {
 	return func(next RpcHandler) RpcHandler {
 		fn := func(conn kadconn.KadWriter, req *request.Request) {
 			mux, _ := req.Body.MultiplexKey()
-			if mux == messages.PingRes {
+			if mux == messages.PingResImplicit {
 				next.Handle(conn, req)
 				return
 			}
@@ -85,7 +85,7 @@ func messageType(t messages.MessageType) string {
 		return "FindValueRequest"
 	case messages.FindValueRes:
 		return "FindValueResponse"
-	case messages.PingRes:
+	case messages.PingResImplicit:
 		return "PingResponse"
 	case messages.PingReq:
 		return "PingRequest"

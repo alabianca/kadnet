@@ -2,18 +2,19 @@ package messages
 
 
 type PingResponse struct {
+	mkey MessageType
 	SenderID string
 	EchoRandomID string
 	RandomID string
 }
 
 func (m *PingResponse) MultiplexKey() MessageType {
-	return PingRes
+	return m.mkey
 }
 
 func (m *PingResponse) Bytes() ([]byte, error) {
 	mkey := make([]byte, 1)
-	mkey[0] = byte(PingRes)
+	mkey[0] = byte(m.mkey)
 	sid, err := SerializeID(m.SenderID)
 	if err != nil {
 		return nil, err
@@ -48,4 +49,16 @@ func (m *PingResponse) GetSenderID() string {
 
 func (m *PingResponse) GetEchoRandomID() string {
 	return m.EchoRandomID
+}
+
+func Implicit() *PingResponse {
+	pr := new(PingResponse)
+	pr.mkey = PingResImplicit
+	return pr
+}
+
+func Explicit() *PingResponse {
+	pr := new(PingResponse)
+	pr.mkey = PingResExplicit
+	return pr
 }

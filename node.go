@@ -206,7 +206,7 @@ func (n *Node) registerRequestHandlers() {
 	)
 	// handlers to run after middlewares executed
 	n.mux.HandleFunc(messages.FindNodeReq, onFindNode(n.dht))
-	n.mux.HandleFunc(messages.PingRes, onPingReply(n.dht, pingReplyBuffer))
+	n.mux.HandleFunc(messages.PingResImplicit, onPingReply(n.dht, pingReplyBuffer))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {
