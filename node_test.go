@@ -256,7 +256,7 @@ func TestNode_Store_Basic(t *testing.T) {
 
 func TestNode_Store_Many(t *testing.T) {
 	nodes := make([]*Node, 10)
-	for i:=0; i < len(nodes); i++ {
+	for i := 0; i < len(nodes); i++ {
 		nodes[i] = NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5000 + i })
 		go func(node *Node) {
 			err := node.Listen(nil)
@@ -270,7 +270,7 @@ func TestNode_Store_Many(t *testing.T) {
 		shutdown(nodes...)
 	}()
 
-	for i := 1; i< len(nodes); i++ {
+	for i := 1; i < len(nodes); i++ {
 		nodes[0].Seed(gokad.Contact{ID: nodes[i].ID(), IP: net.ParseIP(nodes[i].Host), Port: nodes[i].Port})
 	}
 
@@ -304,7 +304,6 @@ func wait(nodes ...*Node) <-chan struct{} {
 		wg.Wait()
 		close(out)
 	}()
-
 
 	return out
 }

@@ -12,8 +12,8 @@ type ReplyThread struct {
 	onRequest  <-chan *request.Request
 	writer     kadconn.KadWriter
 	// buffers
-	nodeReplyBuffer *buffers.NodeReplyBuffer
-	pingReplyBuffer *buffers.PingReplyBuffer
+	nodeReplyBuffer  *buffers.NodeReplyBuffer
+	pingReplyBuffer  *buffers.PingReplyBuffer
 	storeReplyBuffer *buffers.StoreReplyBuffer
 }
 

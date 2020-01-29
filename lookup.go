@@ -1,6 +1,7 @@
 package kadnet
 
 import (
+	"errors"
 	"github.com/alabianca/gokad"
 	"github.com/alabianca/kadnet/buffers"
 	"github.com/alabianca/kadnet/messages"
@@ -8,6 +9,101 @@ import (
 	"sync"
 	"time"
 )
+
+type lookup struct {
+	nodeReplyBuffer buffers.Buffer
+	concurrency     int
+	k               int
+	dht             *dhtProxy
+	client          *Client
+	roundTimeout    time.Duration
+}
+
+type lookupConfig func(l *lookup)
+
+func nodeLookup(config lookupConfig) (*lookup, error) {
+	lp := lookup{
+		concurrency:  3,
+		k:            20,
+		roundTimeout: time.Second * 3,
+	}
+
+	config(&lp)
+	if lp.dht == nil {
+		return nil, errors.New("dht not specified")
+	}
+	if lp.nodeReplyBuffer == nil {
+		return nil, errors.New("node reply buffer not specified")
+	}
+
+	if lp.client == nil {
+		return nil, errors.New("client not specified")
+	}
+
+	return &lp, nil
+}
+
+func (l *lookup) do(id gokad.ID) ([]gokad.Contact, error) {
+	nodeReplyBuffer := l.nodeReplyBuffer
+	if nodeReplyBuffer == nil {
+		return nil, errors.New("cannot open Node Reply Buffer <nil>")
+	}
+	// the nodeReplyBuffer must be opened
+	// once opened it is ready to receive answers to FIND_NODE_RPC's
+	nodeReplyBuffer.Open()
+	defer nodeReplyBuffer.Close()
+
+	concurrency := l.concurrency
+	closestNodes := newMap(compareDistance)
+	for _, c := range l.dht.getAlphaNodes(concurrency, id) {
+		closestNodes.Insert(id.DistanceTo(c.ID), &pendingNode{contact: c})
+	}
+
+	client := l.client
+	timedOutNodes := make(chan findNodeResult)
+	lateReplies := losers(timedOutNodes)
+	next := make([]*pendingNode, concurrency)
+	for nextRound(closestNodes, concurrency, next, l.k) {
+		rc := round(
+			trim(next),
+			client,
+			id,
+			l.roundTimeout,
+			timedOutNodes,
+		)
+
+		var atLeastOneNewNode bool
+		for cs := range mergeLosersAndRound(lateReplies, rc) {
+			if cs.err != nil {
+				continue
+			}
+
+			cs.node.SetAnswered(true)
+			for _, c := range cs.payload {
+				distance := id.DistanceTo(c.ID)
+				if _, ok := closestNodes.Get(distance); !ok {
+					atLeastOneNewNode = true
+					closestNodes.Insert(distance, &pendingNode{contact: c})
+				}
+				// contact details of any node that responded are attempted to be
+				// inserted into the dht
+				l.dht.insert(c)
+			}
+		}
+
+		// if a round did not reveal at least one new node we take all K
+		// closest nodes not already queried and send them FIND_NODE_RPC's
+		if !atLeastOneNewNode {
+			concurrency = l.k
+		} else {
+			concurrency = l.concurrency
+		}
+
+		next = make([]*pendingNode, concurrency)
+	}
+
+	return getKClosestNodes(closestNodes, l.k), nil
+}
 
 var compareDistance = func(d1 gokad.Distance, d2 gokad.Distance) int {
 	for i := 0; i < gokad.SIZE; i++ {

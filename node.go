@@ -184,65 +184,16 @@ func (n *Node) Store(key string, ip net.IP, port int) (int, error) {
 }
 
 func (n *Node) Lookup(id gokad.ID) ([]gokad.Contact, error) {
-	nodeReplyBuffer := n.getBuffer(kadmux.NodeReplyBufferID)
-	if nodeReplyBuffer == nil {
-		return nil, errors.New("cannot open Node Reply Buffer <nil>")
-	}
-	// the nodeReplyBuffer must be opened
-	// once opened it is ready to receive answers to FIND_NODE_RPC's
-	nodeReplyBuffer.Open()
-	defer nodeReplyBuffer.Close()
-
-	concurrency := n.Alpha
-	closestNodes := newMap(compareDistance)
-	for _, c := range n.dht.getAlphaNodes(concurrency, id) {
-		closestNodes.Insert(id.DistanceTo(c.ID), &pendingNode{contact: c})
+	nodeLp, err := nodeLookup(func(l *lookup) {
+		l.dht = n.dht
+		l.nodeReplyBuffer = n.getBuffer(kadmux.NodeReplyBufferID)
+		l.client = n.NewClient()
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	client := n.NewClient()
-	timedOutNodes := make(chan findNodeResult)
-	lateReplies := losers(timedOutNodes)
-	next := make([]*pendingNode, concurrency)
-	for nextRound(closestNodes, concurrency, next, n.K) {
-		rc := round(
-			trim(next),
-			client,
-			id,
-			n.RoundTimeout,
-			timedOutNodes,
-		)
-
-		var atLeastOneNewNode bool
-		for cs := range mergeLosersAndRound(lateReplies, rc) {
-			if cs.err != nil {
-				continue
-			}
-
-			cs.node.SetAnswered(true)
-			for _, c := range cs.payload {
-				distance := id.DistanceTo(c.ID)
-				if _, ok := closestNodes.Get(distance); !ok {
-					atLeastOneNewNode = true
-					closestNodes.Insert(distance, &pendingNode{contact: c})
-				}
-				// contact details of any node that responded are attempted to be
-				// inserted into the dht
-				n.dht.insert(c)
-			}
-		}
-
-		// if a round did not reveal at least one new node we take all K
-		// closest nodes not already queried and send them FIND_NODE_RPC's
-		if !atLeastOneNewNode {
-			concurrency = n.K
-		} else {
-			concurrency = n.Alpha
-		}
-
-		next = make([]*pendingNode, concurrency)
-	}
-
-	return getKClosestNodes(closestNodes, n.K), nil
+	return nodeLp.do(id)
 
 }
 

@@ -64,8 +64,8 @@ func (c *Client) Store(contact gokad.Contact, key gokad.ID, value gokad.Value) (
 	store := messages.StoreRequest{
 		SenderID: c.ID.String(),
 		RandomID: gokad.GenerateRandomID().String(),
-		Payload:  messages.StoreRequestPayload{
-			Key: key,
+		Payload: messages.StoreRequestPayload{
+			Key:   key,
 			Value: value,
 		},
 	}
