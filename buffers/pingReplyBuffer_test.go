@@ -57,6 +57,7 @@ func TestPingReplyBuffer_NotFound(t *testing.T) {
 
 	reader := prb.NewReader(key)
 	var expected messages.FindNodeResponse
+	reader.SetDeadline(time.Millisecond * 500)
 	_, err := reader.Read(&expected)
 
 	if err == nil {

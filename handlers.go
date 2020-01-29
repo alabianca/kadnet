@@ -61,7 +61,6 @@ func onPingReplyImplicit(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandl
 		// they match. Let's attempt to insert contact to our dht
 		proxy.insert(req.Contact)
 
-
 	}
 }
 
@@ -83,5 +82,36 @@ func onPingRequest(myID gokad.ID) kadmux.RpcHandlerFunc {
 		}
 
 		conn.Write(b, req.Address())
+	}
+}
+
+func onStoreRequest(myID gokad.ID, proxy *dhtProxy) kadmux.RpcHandlerFunc {
+	return func(conn kadconn.KadWriter, req *request.Request) {
+		var storeReq messages.StoreRequest
+		messages.ToKademliaMessage(req.Body, &storeReq)
+
+		if storeReq.SenderID == "" {
+			return
+		}
+
+		key := storeReq.Payload.Key
+		ip := storeReq.Payload.Value.Host
+		port := storeReq.Payload.Value.Port
+
+		proxy.store(key, ip, port)
+
+		res := messages.StoreResponse{
+			SenderID:     myID.String(),
+			EchoRandomID: storeReq.RandomID,
+			RandomID:     gokad.GenerateRandomID().String(),
+		}
+
+		b, err := res.Bytes()
+		if err != nil {
+			return
+		}
+
+		conn.Write(b, req.Address())
+
 	}
 }

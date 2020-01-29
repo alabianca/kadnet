@@ -228,7 +228,6 @@ func (n *node) insertFixup(x *node) *node {
 
 }
 
-
 // utility functions
 
 func isBlack(n *node) bool {
@@ -275,7 +274,7 @@ func lineArrangement(n *node) bool {
 // Node is a right child of a left child OR left child of a right child
 func triangleArrangement(n *node) bool {
 	p := n.parent
-	if p == nil || isRoot(p){
+	if p == nil || isRoot(p) {
 		return false
 	}
 
@@ -349,11 +348,13 @@ func rotateRight(n *node) {
 		Solution: Rotate around grandparent AND toggle color of parent and grandparent
 */
 type insertViolation int
+
 const noViolation = insertViolation(0)
 const redRootViolation = insertViolation(1)
 const redUncleViolation = insertViolation(2)
 const lineViolation = insertViolation(3)
 const triangleViolation = insertViolation(4)
+
 func violation(n *node) insertViolation {
 	// 0
 	if isRoot(n) && !isBlack(n) {
@@ -378,5 +379,3 @@ func violation(n *node) insertViolation {
 
 	return noViolation
 }
-
-

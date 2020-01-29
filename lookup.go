@@ -23,9 +23,9 @@ var compareDistance = func(d1 gokad.Distance, d2 gokad.Distance) int {
 }
 
 type pendingNode struct {
-	contact gokad.Contact
+	contact  gokad.Contact
 	answered bool
-	queried bool
+	queried  bool
 }
 
 func (p *pendingNode) Contact() gokad.Contact {
@@ -45,11 +45,26 @@ func (p *pendingNode) SetQueried(x bool) {
 }
 
 type findNodeResult struct {
-	node *pendingNode
-	payload []gokad.Contact
+	node     *pendingNode
+	payload  []gokad.Contact
 	response *response.Response
-	err error
+	err      error
+}
 
+func getKClosestNodes(m *treeMap, K int) []gokad.Contact {
+	var index int
+	out := make([]gokad.Contact, 0)
+	m.Traverse(func(k gokad.Distance, v *pendingNode) bool {
+		if index == K {
+			return false
+		}
+
+		out = append(out, v.contact)
+
+		return true
+	})
+
+	return out
 }
 
 // nextRound traverses m up to K pendingNodes and fills nodes with max pendingNodes
@@ -101,7 +116,7 @@ func round(nodes []*pendingNode, rpc RPC, lookupID gokad.ID, timeout time.Durati
 	for _, n := range nodes {
 		go func(node *pendingNode) {
 			defer wg.Done()
-			res := <- sendFindNodeRPC(node, rpc, lookupID, timeout)
+			res := <-sendFindNodeRPC(node, rpc, lookupID, timeout)
 			if res.err != nil && res.err.Error() == buffers.TimeoutErr {
 				timeouts <- res
 			} else {
@@ -135,7 +150,6 @@ func sendFindNodeRPC(node *pendingNode, rpc RPC, lookupID gokad.ID, timeout time
 
 	return out
 }
-
 
 func read(node *pendingNode, res *response.Response, out chan<- findNodeResult) {
 	var fnr messages.FindNodeResponse

@@ -37,7 +37,6 @@ func TestTreeMap_Traverse(t *testing.T) {
 	})
 }
 
-
 func generateContact(id string) gokad.Contact {
 	x, _ := gokad.From(id)
 	return gokad.Contact{
@@ -46,4 +45,3 @@ func generateContact(id string) gokad.Contact {
 		Port: 5050,
 	}
 }
-

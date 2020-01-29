@@ -89,6 +89,20 @@ func ToKademliaMessage(msg Message, km KademliaMessage) {
 	p, _ := msg.Payload()
 
 	switch v := km.(type) {
+	case *StoreResponse:
+		*v = StoreResponse{
+			SenderID:     ToStringId(sid),
+			EchoRandomID: ToStringId(eid),
+			RandomID:     ToStringId(rid),
+		}
+	case *StoreRequest:
+		if p, err := parseStoreRequestPayload(p); err == nil {
+			*v = StoreRequest{
+				SenderID: ToStringId(sid),
+				RandomID: ToStringId(rid),
+				Payload:  p,
+			}
+		}
 	case *PingRequest:
 		*v = PingRequest{
 			SenderID: ToStringId(sid),
@@ -182,6 +196,21 @@ func toContact(b []byte) (gokad.Contact, error) {
 
 	return c, nil
 
+}
+
+func parseStoreRequestPayload(b []byte) (StoreRequestPayload, error) {
+	length := 38
+	if len(b) != length {
+		return StoreRequestPayload{}, errors.New("malformed Store Request")
+	}
+
+	// we can use toContact here as the payload uses the same structure
+	c, err := toContact(b)
+	if err != nil {
+		return StoreRequestPayload{}, errors.New("malformed Store Request")
+	}
+
+	return StoreRequestPayload{Key: c.ID, Value: gokad.Value{Host: c.IP, Port: c.Port}}, nil
 }
 
 func IsValid(msgType MessageType) bool {

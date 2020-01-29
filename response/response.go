@@ -10,20 +10,20 @@ import (
 )
 
 type Response struct {
-	Contact        gokad.Contact
-	Body           buffers.Buffer
+	Contact gokad.Contact
+	Body    buffers.Buffer
 	// SendPingReplyFunc is called whenever a response is successfully
 	// read in Response.Read
 	SendPingReplyFunc func(echoRandomID string)
-	matcher        string
-	readTimeout    time.Duration
+	matcher           string
+	readTimeout       time.Duration
 }
 
 func New(c gokad.Contact, matcher string, buffer buffers.Buffer) *Response {
 	return &Response{
-		Contact:        c,
-		Body:           buffer,
-		matcher:        matcher,
+		Contact: c,
+		Body:    buffer,
+		matcher: matcher,
 	}
 }
 
@@ -56,7 +56,6 @@ func (r *Response) Read(km messages.KademliaMessage) (int, error) {
 
 	return n, err
 }
-
 
 func (r *Response) resetTimeout() {
 	r.readTimeout = time.Duration(0)

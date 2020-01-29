@@ -12,6 +12,7 @@ import (
 const HandlerNotFoundErr = "Handler Not Found"
 const NodeReplyBufferID = "NodeReplyBuffer"
 const PingReplyBufferID = "PingReplyBuffer"
+const StoreReplyBufferID = "StoreReplyBuffer"
 
 type Mux interface {
 	Handle(c kadconn.KadConn) error
@@ -55,8 +56,9 @@ func NewMux() Mux {
 		onResponse:      make(chan messages.Message),
 		exit:            make(chan error),
 		buffers: map[string]buffers.Buffer{
-			NodeReplyBufferID: buffers.NewNodeReplyBuffer(),
-			PingReplyBufferID: buffers.NewPingReplyBuffer(),
+			NodeReplyBufferID:  buffers.NewNodeReplyBuffer(),
+			PingReplyBufferID:  buffers.NewPingReplyBuffer(),
+			StoreReplyBufferID: buffers.NewStoreReplyBuffer(),
 		},
 	}
 }
@@ -103,7 +105,6 @@ func (k *kadMux) Handle(conn kadconn.KadConn) error {
 	}
 
 	k.buffers[PingReplyBufferID].Open()
-
 
 	k.stopReceiver = make(chan chan error)
 	k.stopReply = make(chan chan error)
@@ -162,8 +163,8 @@ func (k *kadMux) handle(handler RpcHandler) RpcHandler {
 		return handler
 	}
 
-	h := k.middlewares[len(k.middlewares) - 1](handler)
-	for i := len(k.middlewares) -2; i >= 0; i-- {
+	h := k.middlewares[len(k.middlewares)-1](handler)
+	for i := len(k.middlewares) - 2; i >= 0; i-- {
 		h = k.middlewares[i](h)
 	}
 

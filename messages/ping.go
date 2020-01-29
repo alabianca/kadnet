@@ -1,11 +1,10 @@
 package messages
 
-
 type PingResponse struct {
-	mkey MessageType
-	SenderID string
+	mkey         MessageType
+	SenderID     string
 	EchoRandomID string
-	RandomID string
+	RandomID     string
 }
 
 func (m *PingResponse) MultiplexKey() MessageType {

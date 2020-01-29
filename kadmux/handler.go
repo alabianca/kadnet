@@ -8,7 +8,6 @@ import (
 	"github.com/alabianca/kadnet/messages"
 	"github.com/alabianca/kadnet/request"
 	"io"
-
 )
 
 type RpcHandlerFunc func(conn kadconn.KadWriter, req *request.Request)
@@ -34,7 +33,7 @@ func ExpectPingReply(buffer buffers.Buffer) func(next RpcHandler) RpcHandler {
 				next.Handle(conn, req)
 				return
 			}
-			
+
 			writer := buffer.NewWriter()
 			sid, _ := req.Body.SenderID()
 			rid, _ := req.Body.RandomID()

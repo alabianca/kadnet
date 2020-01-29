@@ -17,7 +17,7 @@ type expectedPingReply struct {
 type pingReplyCheck struct {
 	id       string
 	response chan messages.Message
-	expiry time.Time
+	expiry   time.Time
 }
 
 type PingReplyBuffer struct {
@@ -66,7 +66,7 @@ func (b *PingReplyBuffer) IsOpen() bool {
 func (b *PingReplyBuffer) First(km messages.KademliaMessage) {
 	in := make(chan messages.Message, 1)
 	b.getFirst <- in
-	msg := <- in
+	msg := <-in
 	messages.ToKademliaMessage(msg, km)
 }
 
@@ -91,7 +91,7 @@ func (b *PingReplyBuffer) accept() {
 			purge = time.After(time.Second * 60)
 		}
 
-		var fanout chan<-messages.Message
+		var fanout chan<- messages.Message
 		var next messages.Message
 		var nextKey string
 		if getFirst != nil && len(buf) > 0 {
@@ -175,12 +175,12 @@ func getFirstInBuf(buf map[string]expectedPingReply) (string, messages.Message) 
 		break
 	}
 
-	return key,  msg
+	return key, msg
 }
 
 type pingReplyReader struct {
-	get chan <- pingReplyCheck
-	id string
+	get          chan<- pingReplyCheck
+	id           string
 	readDeadline time.Duration
 }
 
@@ -201,7 +201,7 @@ func (r *pingReplyReader) Read(km messages.KademliaMessage) (int, error) {
 	}
 
 	select {
-	case msg := <- query.response:
+	case msg := <-query.response:
 		if msg != nil {
 			messages.ToKademliaMessage(msg, km)
 			return len(msg), nil
@@ -211,7 +211,6 @@ func (r *pingReplyReader) Read(km messages.KademliaMessage) (int, error) {
 		return 0, errors.New(TimeoutErr)
 	}
 }
-
 
 type pingReplyWriter struct {
 	setExpected chan messages.Message

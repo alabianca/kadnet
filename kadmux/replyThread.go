@@ -14,19 +14,22 @@ type ReplyThread struct {
 	// buffers
 	nodeReplyBuffer *buffers.NodeReplyBuffer
 	pingReplyBuffer *buffers.PingReplyBuffer
+	storeReplyBuffer *buffers.StoreReplyBuffer
 }
 
 func NewReplyThread(res chan messages.Message, req <-chan *request.Request, writer kadconn.KadWriter) *ReplyThread {
 	return &ReplyThread{
-		onRequest:       req,
-		onResponse:      res,
-		writer:          writer,
+		onRequest:  req,
+		onResponse: res,
+		writer:     writer,
 	}
 }
 
 func (r *ReplyThread) SetBuffers(bf ...buffers.Buffer) {
 	for _, buf := range bf {
 		switch v := buf.(type) {
+		case *buffers.StoreReplyBuffer:
+			r.storeReplyBuffer = v
 		case *buffers.PingReplyBuffer:
 			r.pingReplyBuffer = v
 		case *buffers.NodeReplyBuffer:
@@ -77,6 +80,8 @@ func (r *ReplyThread) tempStoreMsg(km messages.Message) {
 func (r *ReplyThread) getBuffer(key messages.MessageType) buffers.Buffer {
 	var buf buffers.Buffer
 	switch key {
+	case messages.StoreRes:
+		buf = r.storeReplyBuffer
 	case messages.PingResExplicit:
 		buf = r.pingReplyBuffer
 	case messages.FindNodeRes:

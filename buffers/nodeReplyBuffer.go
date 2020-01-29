@@ -1,6 +1,5 @@
 package buffers
 
-
 import (
 	"errors"
 	"github.com/alabianca/gokad"
@@ -10,7 +9,6 @@ import (
 
 const TimeoutErr = "timeout occured"
 const ClosedBufferErr = "closed buffer error"
-
 
 type readQuery struct {
 	id       string

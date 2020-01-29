@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -77,7 +78,7 @@ func (n *Node) Bootstrap(port int, ip string) error {
 	}
 
 	// 2. node lookup for own id
-	if err := n.Lookup(n.ID()); err != nil {
+	if _, err := n.Lookup(n.ID()); err != nil {
 		return err
 	}
 
@@ -134,10 +135,58 @@ func (n *Node) Ping(host net.IP, port int, id gokad.ID) (gokad.Contact, error) {
 
 }
 
-func (n *Node) Lookup(id gokad.ID) error {
+func (n *Node) Store(key string, ip net.IP, port int) (int, error) {
+	buf := n.getBuffer(kadmux.StoreReplyBufferID)
+	if buf == nil {
+		return 0, errors.New("could not open buffer")
+	}
+	buf.Open()
+	defer buf.Close()
+
+	keyID, err := gokad.From(key)
+	if err != nil {
+		return 0, err
+	}
+
+	cs, err := n.Lookup(keyID)
+	if err != nil {
+		return 0, err
+	}
+
+	client := n.NewClient()
+	storeSent := make(chan int)
+	var wg sync.WaitGroup
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go func(contact gokad.Contact) {
+			defer wg.Done()
+			res, err := client.Store(contact, keyID, gokad.Value{Host: ip, Port: port})
+			if err != nil {
+				storeSent <- 0
+			}
+
+			res.Read(&messages.StoreResponse{})
+			storeSent <- 1
+		}(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(storeSent)
+	}()
+
+	var total int
+	for n := range storeSent {
+		total += n
+	}
+
+	return total, nil
+}
+
+func (n *Node) Lookup(id gokad.ID) ([]gokad.Contact, error) {
 	nodeReplyBuffer := n.getBuffer(kadmux.NodeReplyBufferID)
 	if nodeReplyBuffer == nil {
-		return errors.New("cannot open Node Reply Buffer <nil>")
+		return nil, errors.New("cannot open Node Reply Buffer <nil>")
 	}
 	// the nodeReplyBuffer must be opened
 	// once opened it is ready to receive answers to FIND_NODE_RPC's
@@ -193,18 +242,20 @@ func (n *Node) Lookup(id gokad.ID) error {
 		next = make([]*pendingNode, concurrency)
 	}
 
-	return nil
+	return getKClosestNodes(closestNodes, n.K), nil
 
 }
 
 func (n *Node) NewClient() *Client {
 	nodeReplyBuf, _ := n.getBuffer(kadmux.NodeReplyBufferID).(*buffers.NodeReplyBuffer)
 	pingReplyBuf, _ := n.getBuffer(kadmux.PingReplyBufferID).(*buffers.PingReplyBuffer)
+	storeReplyBuf, _ := n.getBuffer(kadmux.StoreReplyBufferID).(*buffers.StoreReplyBuffer)
 	return &Client{
-		ID:              n.dht.getOwnID(),
-		Writer:          n.conn,
-		NodeReplyBuffer: nodeReplyBuf,
-		PingReplyBuffer: pingReplyBuf,
+		ID:               n.dht.getOwnID(),
+		Writer:           n.conn,
+		NodeReplyBuffer:  nodeReplyBuf,
+		PingReplyBuffer:  pingReplyBuf,
+		StoreReplyBuffer: storeReplyBuf,
 	}
 }
 
@@ -224,6 +275,7 @@ func (n *Node) registerRequestHandlers() {
 	n.mux.HandleFunc(messages.FindNodeReq, onFindNode(n.dht))
 	n.mux.HandleFunc(messages.PingResImplicit, onPingReplyImplicit(n.dht, pingReplyBuffer))
 	n.mux.HandleFunc(messages.PingReq, onPingRequest(n.ID()))
+	n.mux.HandleFunc(messages.StoreReq, onStoreRequest(n.ID(), n.dht))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {

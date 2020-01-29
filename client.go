@@ -11,17 +11,18 @@ import (
 )
 
 type Client struct {
-	ID gokad.ID
-	Writer kadconn.KadWriter
-	NodeReplyBuffer buffers.Buffer
-	PingReplyBuffer buffers.Buffer
+	ID               gokad.ID
+	Writer           kadconn.KadWriter
+	NodeReplyBuffer  buffers.Buffer
+	PingReplyBuffer  buffers.Buffer
+	StoreReplyBuffer buffers.Buffer
 }
 
 func (c *Client) FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.Response, error) {
 	fnr := messages.FindNodeRequest{
-		SenderID:     c.ID.String()	,
-		Payload:      lookupID.String(),
-		RandomID:     gokad.GenerateRandomID().String(),
+		SenderID: c.ID.String(),
+		Payload:  lookupID.String(),
+		RandomID: gokad.GenerateRandomID().String(),
 	}
 
 	b, err := fnr.Bytes()
@@ -59,6 +60,30 @@ func (c *Client) Ping(contact gokad.Contact) (*response.Response, error) {
 	return res, nil
 }
 
+func (c *Client) Store(contact gokad.Contact, key gokad.ID, value gokad.Value) (*response.Response, error) {
+	store := messages.StoreRequest{
+		SenderID: c.ID.String(),
+		RandomID: gokad.GenerateRandomID().String(),
+		Payload:  messages.StoreRequestPayload{
+			Key: key,
+			Value: value,
+		},
+	}
+
+	b, err := store.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	req := request.New(contact, b)
+	c.do(req)
+
+	res := response.New(contact, "", c.StoreReplyBuffer)
+	res.SendPingReplyFunc = c.implicitPingReplyFunc(req.Address())
+
+	return res, nil
+}
+
 func (c *Client) implicitPingReplyFunc(address net.Addr) func(echoRandomID string) {
 	return func(echoRandomID string) {
 		pingRes := messages.Implicit()
@@ -74,4 +99,3 @@ func (c *Client) implicitPingReplyFunc(address net.Addr) func(echoRandomID strin
 func (c *Client) do(req *request.Request) {
 	go c.Writer.Write(req.Body, req.Address())
 }
-

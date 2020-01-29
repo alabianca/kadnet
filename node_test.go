@@ -4,6 +4,7 @@ import (
 	"github.com/alabianca/gokad"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -48,7 +49,7 @@ func TestNodeLookup_Basic(t *testing.T) {
 	<-bootstrapNode.started
 	<-joining.started
 
-	err := joining.Lookup(joining.ID())
+	_, err := joining.Lookup(joining.ID())
 	if err != nil {
 		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
@@ -87,7 +88,7 @@ func TestNodeLookup_Nested(t *testing.T) {
 
 	joining := nodes[len(nodes)-1]
 	<-joining.started
-	if err := joining.Lookup(joining.ID()); err != nil {
+	if _, err := joining.Lookup(joining.ID()); err != nil {
 		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
 
@@ -227,6 +228,85 @@ func TestNode_Bootstrap(t *testing.T) {
 			t.Fatalf("Expected count to be %d, but got %d\n", check.COUNT, count)
 		}
 	}
+}
+
+func TestNode_Store_Basic(t *testing.T) {
+	node1 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5002 })
+	go node1.Listen(nil)
+	go node2.Listen(nil)
+	defer func() {
+		shutdown(node1, node2)
+	}()
+
+	<-node1.started
+	<-node2.started
+
+	err := node1.Bootstrap(5002, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("Expected err to be nil, but got %s\n", err)
+	}
+
+	key := gokad.GenerateRandomID()
+	_, err = node1.Store(key.String(), net.ParseIP("127.0.0.1"), 7000)
+	if err != nil {
+		t.Fatalf("Expected err to be nil after Store, but got %s\n", err)
+	}
+}
+
+func TestNode_Store_Many(t *testing.T) {
+	nodes := make([]*Node, 10)
+	for i:=0; i < len(nodes); i++ {
+		nodes[i] = NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5000 + i })
+		go func(node *Node) {
+			err := node.Listen(nil)
+			if err != nil {
+				t.Fatalf("Listen error %s\n", err)
+			}
+		}(nodes[i])
+	}
+
+	defer func() {
+		shutdown(nodes...)
+	}()
+
+	for i := 1; i< len(nodes); i++ {
+		nodes[0].Seed(gokad.Contact{ID: nodes[i].ID(), IP: net.ParseIP(nodes[i].Host), Port: nodes[i].Port})
+	}
+
+	<-wait(nodes...)
+
+	key := gokad.GenerateRandomID()
+	n, err := nodes[0].Store(key.String(), net.ParseIP("127.0.0.1"), 8000)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
+	}
+
+	if n != 3 {
+		t.Fatalf("Expected a store rpc to be sent to %d nodes, but was only sent to %d", 3, n)
+	}
+
+}
+
+func wait(nodes ...*Node) <-chan struct{} {
+	out := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(len(nodes))
+
+	for _, n := range nodes {
+		go func(node *Node) {
+			<-node.started
+			wg.Done()
+		}(n)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+
+	return out
 }
 
 func shutdown(nodes ...*Node) {

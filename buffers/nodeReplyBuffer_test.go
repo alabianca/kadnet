@@ -83,7 +83,7 @@ func TestNodeReplyBuffer_Read(t *testing.T) {
 func TestNodeReplyBuffer_AsyncRead(t *testing.T) {
 	nrb := NewNodeReplyBuffer()
 	// open the buffer for reading and writing
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	nrb.Open()
 	defer nrb.Close()
 	fnr := messages.FindNodeResponse{
@@ -120,7 +120,6 @@ func TestNodeReplyBuffer_Close(t *testing.T) {
 	x := runtime.NumGoroutine()
 	nrb.Open()
 	nrb.Close()
-
 
 	if nrb.IsOpen() {
 		t.Fatalf("Expected buffer to be closed after .Close")
@@ -160,4 +159,3 @@ func generateContact(id string) gokad.Contact {
 		Port: 5050,
 	}
 }
-

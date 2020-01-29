@@ -26,7 +26,7 @@ type KadWriter interface {
 func New(pc net.PacketConn) KadConn {
 	c := conn{
 		mtx: sync.Mutex{},
-		pc: pc,
+		pc:  pc,
 	}
 
 	return &c
@@ -34,8 +34,7 @@ func New(pc net.PacketConn) KadConn {
 
 type conn struct {
 	mtx sync.Mutex
-	pc net.PacketConn
-
+	pc  net.PacketConn
 }
 
 func (c *conn) Close() error {

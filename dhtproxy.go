@@ -13,8 +13,8 @@ type dhtProxy struct {
 
 func newDhtProxy(dht *gokad.DHT) *dhtProxy {
 	return &dhtProxy{
-		dht:     dht,
-		mtx:     sync.Mutex{},
+		dht: dht,
+		mtx: sync.Mutex{},
 	}
 }
 
@@ -24,16 +24,16 @@ func (proxy *dhtProxy) getOwnID() []byte {
 	return id
 }
 
-func (proxy *dhtProxy) bootstrap(port int, ip, idHex string) (gokad.Contact, int, error) {
-	proxy.mtx.Lock()
-	defer proxy.mtx.Unlock()
-	return proxy.dht.Bootstrap(port, net.ParseIP(ip), idHex)
-}
-
 func (proxy *dhtProxy) insert(c gokad.Contact) (gokad.Contact, int, error) {
 	proxy.mtx.Lock()
 	defer proxy.mtx.Unlock()
-	return proxy.dht.RoutingTable.Add(c)
+	return proxy.dht.RoutingTable().Add(c)
+}
+
+func (proxy *dhtProxy) store(key gokad.ID, ip net.IP, port int) {
+	proxy.mtx.Lock()
+	defer proxy.mtx.Unlock()
+	proxy.dht.Store(key, ip, port)
 }
 
 func (proxy *dhtProxy) getAlphaNodes(alpha int, id gokad.ID) []gokad.Contact {
@@ -50,7 +50,7 @@ func (proxy *dhtProxy) findNode(id gokad.ID) []gokad.Contact {
 }
 
 func (proxy *dhtProxy) walk(f func(bucketIndex int, c gokad.Contact)) {
-	routing := proxy.dht.RoutingTable
+	routing := proxy.dht.RoutingTable()
 	for i := 0; i < gokad.MaxRoutingTableSize; i++ {
 		bucket, ok := routing.Bucket(i)
 		if ok {
@@ -61,4 +61,3 @@ func (proxy *dhtProxy) walk(f func(bucketIndex int, c gokad.Contact)) {
 		}
 	}
 }
-
