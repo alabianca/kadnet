@@ -34,7 +34,7 @@ func onFindNode(proxy *dhtProxy) kadmux.RpcHandlerFunc {
 	}
 }
 
-func onPingReply(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandlerFunc {
+func onPingReplyImplicit(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandlerFunc {
 	return func(conn kadconn.KadWriter, req *request.Request) {
 		// find the pingReplyMessage in the buffer
 		id, err := req.Body.EchoRandomID()
@@ -62,5 +62,26 @@ func onPingReply(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandlerFunc {
 		proxy.insert(req.Contact)
 
 
+	}
+}
+
+func onPingRequest(myID gokad.ID) kadmux.RpcHandlerFunc {
+	return func(conn kadconn.KadWriter, req *request.Request) {
+		rid, err := req.Body.RandomID()
+		if err != nil {
+			return
+		}
+
+		res := messages.Explicit()
+		res.RandomID = gokad.GenerateRandomID().String()
+		res.EchoRandomID = gokad.ID(rid).String()
+		res.SenderID = myID.String()
+
+		b, err := res.Bytes()
+		if err != nil {
+			return
+		}
+
+		conn.Write(b, req.Address())
 	}
 }

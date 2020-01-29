@@ -22,7 +22,6 @@ type KademliaMessage interface {
 
 const (
 	// Message Types
-	NodeLookup      = MessageType(30)
 	FindNodeReq     = MessageType(20)
 	FindNodeRes     = MessageType(21)
 	PingReq         = MessageType(22)
@@ -90,6 +89,11 @@ func ToKademliaMessage(msg Message, km KademliaMessage) {
 	p, _ := msg.Payload()
 
 	switch v := km.(type) {
+	case *PingRequest:
+		*v = PingRequest{
+			SenderID: ToStringId(sid),
+			RandomID: ToStringId(rid),
+		}
 	case *PingResponse:
 		*v = PingResponse{
 			SenderID:     ToStringId(sid),

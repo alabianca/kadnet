@@ -140,6 +140,38 @@ func TestPingReply(t *testing.T) {
 	}
 }
 
+func TestNode_Ping(t *testing.T) {
+	node1 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5002 })
+
+	go node1.Listen(nil)
+	go node2.Listen(nil)
+	defer func() {
+		shutdown(node1)
+		shutdown(node2)
+	}()
+
+	<-node2.started
+	<-node1.started
+
+	c, err := node1.pingAndGetFirst(net.ParseIP("127.0.0.1"), 5002, nil)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
+	}
+
+	expectedID := make(gokad.ID, 20)
+	copy(expectedID, node2.ID())
+	expected := gokad.Contact{
+		ID:   expectedID,
+		IP:   net.ParseIP("127.0.0.1"),
+		Port: 5002,
+	}
+
+	if !reflect.DeepEqual(c, expected) {
+		t.Fatalf("Expected %s:%d:%s but got \n%s:%d:%s", expected.IP, expected.Port, expected.ID, c.IP, c.Port, c.ID)
+	}
+}
+
 func shutdown(nodes ...*Node) {
 	for _, n := range nodes {
 		n.Shutdown()

@@ -120,6 +120,15 @@ func (n *Node) Listen(mux kadmux.Mux) error {
 	return n.mux.Handle(c)
 }
 
+func (n *Node) Ping(host net.IP, port int, id gokad.ID) (gokad.Contact, error) {
+	if id == nil {
+		return gokad.Contact{}, errors.New("id not provided")
+	}
+
+	return n.ping(host, port, id)
+
+}
+
 func (n *Node) Lookup(id gokad.ID) error {
 	nodeReplyBuffer := n.getBuffer(kadmux.NodeReplyBufferID)
 	if nodeReplyBuffer == nil {
@@ -184,11 +193,13 @@ func (n *Node) Lookup(id gokad.ID) error {
 }
 
 func (n *Node) NewClient() *Client {
-	nodeReplyBuf, _ := n.mux.GetBuffer(kadmux.NodeReplyBufferID).(*buffers.NodeReplyBuffer)
+	nodeReplyBuf, _ := n.getBuffer(kadmux.NodeReplyBufferID).(*buffers.NodeReplyBuffer)
+	pingReplyBuf, _ := n.getBuffer(kadmux.PingReplyBufferID).(*buffers.PingReplyBuffer)
 	return &Client{
 		ID:              n.dht.getOwnID(),
 		Writer:          n.conn,
 		NodeReplyBuffer: nodeReplyBuf,
+		PingReplyBuffer: pingReplyBuf,
 	}
 }
 
@@ -201,18 +212,77 @@ func (n *Node) registerRequestHandlers() {
 	// register middlewares
 	pingReplyBuffer := n.getBuffer(kadmux.PingReplyBufferID)
 	n.mux.Use(
-		kadmux.Logging(os.Stdout),                                     // Log requests to stdout
+		kadmux.Logging(os.Stdout),               // Log requests to stdout
 		kadmux.ExpectPingReply(pingReplyBuffer), // write the expected PingReplyMessage to the buffer
 	)
 	// handlers to run after middlewares executed
 	n.mux.HandleFunc(messages.FindNodeReq, onFindNode(n.dht))
-	n.mux.HandleFunc(messages.PingResImplicit, onPingReply(n.dht, pingReplyBuffer))
+	n.mux.HandleFunc(messages.PingResImplicit, onPingReplyImplicit(n.dht, pingReplyBuffer))
+	n.mux.HandleFunc(messages.PingReq, onPingRequest(n.ID()))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {
 	conn, err := net.ListenPacket("udp", net.JoinHostPort(n.Host, strconv.Itoa(n.Port)))
 
 	return kadconn.New(conn), err
+}
+
+func (n *Node) ping(host net.IP, port int, id gokad.ID) (gokad.Contact, error) {
+	res, err := n.sendPing(host, port, id)
+	if err != nil {
+		return gokad.Contact{}, err
+	}
+
+	var pr messages.PingResponse
+	res.ReadTimeout(time.Second * 2)
+	if _, err := res.Read(&pr); err != nil {
+		return gokad.Contact{}, err
+	}
+
+	senderId, err := gokad.From(pr.SenderID)
+	if err != nil {
+		return gokad.Contact{}, err
+	}
+
+	return gokad.Contact{ID: senderId, IP: host, Port: port}, nil
+}
+
+// pingAndGetFirst pings the node at the given host and port
+// and returns the first pingResponse it has in its buffer
+// this function should only be used in the bootstrap procedure
+// since we don't know our gateway's id yet
+func (n *Node) pingAndGetFirst(host net.IP, port int) (gokad.Contact, error) {
+
+	res, err := n.sendPing(host, port, nil)
+	if err != nil {
+		return gokad.Contact{}, err
+	}
+
+	prb, _ := res.Body.(*buffers.PingReplyBuffer)
+	var pr messages.PingResponse
+	prb.First(&pr)
+
+	if pr.SenderID == "" {
+		return gokad.Contact{}, errors.New("could not get first message of ping reply buffer")
+	}
+
+	idr, err := gokad.From(pr.SenderID)
+	if err != nil {
+		return gokad.Contact{}, err
+	}
+
+	return gokad.Contact{ID: idr, IP: host, Port: port}, nil
+}
+
+func (n *Node) sendPing(host net.IP, port int, id gokad.ID) (*response.Response, error) {
+	client := n.NewClient()
+	contact := gokad.Contact{
+		ID:   id,
+		IP:   host,
+		Port: port,
+	}
+
+	return client.Ping(contact)
 }
 
 func defaultMux() kadmux.Mux {
