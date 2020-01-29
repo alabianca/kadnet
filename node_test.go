@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-
 func TestNodeLookup_Basic(t *testing.T) {
 	passive := make([]*Node, 10)
 
@@ -59,8 +58,8 @@ func TestNodeLookup_Basic(t *testing.T) {
 		count++
 	})
 
-	if count != len(passive) + 1 {
-		t.Fatalf("Expected %d contacts in the routing table, but got %d\n", len(passive) + 1, count)
+	if count != len(passive)+1 {
+		t.Fatalf("Expected %d contacts in the routing table, but got %d\n", len(passive)+1, count)
 	}
 }
 
@@ -68,7 +67,7 @@ func TestNodeLookup_Nested(t *testing.T) {
 	nodes := make([]*Node, 0)
 	max := 20
 	for i := 0; i <= max; i++ {
-		node := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5000 + i})
+		node := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5000 + i })
 		nodes = append(nodes, node)
 
 		if i > 0 {
@@ -86,9 +85,8 @@ func TestNodeLookup_Nested(t *testing.T) {
 
 	defer shutdown(nodes...)
 
-
-	joining := nodes[len(nodes) - 1]
-	<- joining.started
+	joining := nodes[len(nodes)-1]
+	<-joining.started
 	if err := joining.Lookup(joining.ID()); err != nil {
 		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
@@ -147,14 +145,13 @@ func TestNode_Ping(t *testing.T) {
 	go node1.Listen(nil)
 	go node2.Listen(nil)
 	defer func() {
-		shutdown(node1)
-		shutdown(node2)
+		shutdown(node1, node2)
 	}()
 
 	<-node2.started
 	<-node1.started
 
-	c, err := node1.pingAndGetFirst(net.ParseIP("127.0.0.1"), 5002, nil)
+	c, err := node1.pingAndGetFirst(net.ParseIP("127.0.0.1"), 5002)
 	if err != nil {
 		t.Fatalf("Expected error to be nil, but got %s\n", err)
 	}
@@ -169,6 +166,66 @@ func TestNode_Ping(t *testing.T) {
 
 	if !reflect.DeepEqual(c, expected) {
 		t.Fatalf("Expected %s:%d:%s but got \n%s:%d:%s", expected.IP, expected.Port, expected.ID, c.IP, c.Port, c.ID)
+	}
+}
+
+func TestNode_Bootstrap(t *testing.T) {
+	node1 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5002 })
+	node3 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5003 })
+	node4 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5004 })
+	go node1.Listen(nil)
+	go node2.Listen(nil)
+	go node3.Listen(nil)
+	go node4.Listen(nil)
+	defer func() {
+		shutdown(node1, node2, node3, node4)
+	}()
+
+	node2.Seed(gokad.Contact{ID: node3.ID(), IP: net.ParseIP("127.0.0.1"), Port: 5003})
+	node2.Seed(gokad.Contact{ID: node4.ID(), IP: net.ParseIP("127.0.0.1"), Port: 5004})
+
+	<-node2.started
+	<-node1.started
+
+	err := node1.Bootstrap(5002, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("Expected err to be nil, but got %s\n", err)
+	}
+
+	// give all nodes time to update their tables since it is async
+	time.Sleep(time.Millisecond * 500)
+	checks := []struct {
+		IN    *Node
+		COUNT int
+	}{
+		{
+			IN:    node1,
+			COUNT: 3,
+		},
+		{
+			IN:    node2,
+			COUNT: 3,
+		},
+		{
+			IN:    node3,
+			COUNT: 1,
+		},
+		{
+			IN:    node4,
+			COUNT: 1,
+		},
+	}
+
+	for _, check := range checks {
+		var count int
+		check.IN.Walk(func(index int, c gokad.Contact) {
+			count++
+		})
+
+		if count != check.COUNT {
+			t.Fatalf("Expected count to be %d, but got %d\n", check.COUNT, count)
+		}
 	}
 }
 

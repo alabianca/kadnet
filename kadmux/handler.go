@@ -86,7 +86,7 @@ func messageType(t messages.MessageType) string {
 	case messages.FindValueRes:
 		return "FindValueResponse"
 	case messages.PingResImplicit:
-		return "PingResponse"
+		return "PingResponse[Implicit]"
 	case messages.PingReq:
 		return "PingRequest"
 	case messages.StoreReq:

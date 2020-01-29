@@ -52,23 +52,28 @@ type findNodeResult struct {
 
 }
 
-func nextRound(m *treeMap, max int, nodes []*pendingNode) bool {
+// nextRound traverses m up to K pendingNodes and fills nodes with max pendingNodes
+func nextRound(m *treeMap, max int, nodes []*pendingNode, K int) bool {
+	var count int
 	var index int
 	m.Traverse(func(k gokad.Distance, node *pendingNode) bool {
-		if !node.Queried() && index < max {
-			node.SetQueried(true)
-			nodes[index] = node
-			index++
+		if index == K {
+			return false
 		}
-
-		if index >= max {
+		if !node.Queried() && count < max {
+			node.SetQueried(true)
+			nodes[count] = node
+			count++
+		}
+		index++
+		if count >= max {
 			return false
 		}
 
 		return true
 	})
 
-	if index > 0 {
+	if count > 0 {
 		return true
 	}
 

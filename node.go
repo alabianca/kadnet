@@ -65,16 +65,21 @@ func NewNode(dht *gokad.DHT, configs ...NodeConfig) *Node {
 @Source: Implementation of the Kademlia Hash Table by Bruno Spori Semester Thesis
 https://pub.tik.ee.ethz.ch/students/2006-So/SA-2006-19.pdf
 **/
-func (n *Node) Bootstrap(port int, ip, idHex string) error {
+func (n *Node) Bootstrap(port int, ip string) error {
 	// 1. Insert Gateway into k-bucket
-	_, _, err := n.dht.bootstrap(port, ip, idHex)
+	c, err := n.pingAndGetFirst(net.ParseIP(ip), port)
 	if err != nil {
 		return err
 	}
 
+	if _, _, err := n.dht.insert(c); err != nil {
+		return err
+	}
+
 	// 2. node lookup for own id
-	//n.nodeLookup(n.ID())
-	n.Lookup(n.ID())
+	if err := n.Lookup(n.ID()); err != nil {
+		return err
+	}
 
 	// 3. @todo
 
@@ -140,16 +145,16 @@ func (n *Node) Lookup(id gokad.ID) error {
 	defer nodeReplyBuffer.Close()
 
 	concurrency := n.Alpha
-	pendingNodes := newMap(compareDistance)
+	closestNodes := newMap(compareDistance)
 	for _, c := range n.dht.getAlphaNodes(concurrency, id) {
-		pendingNodes.Insert(id.DistanceTo(c.ID), &pendingNode{contact: c})
+		closestNodes.Insert(id.DistanceTo(c.ID), &pendingNode{contact: c})
 	}
 
 	client := n.NewClient()
 	timedOutNodes := make(chan findNodeResult)
 	lateReplies := losers(timedOutNodes)
 	next := make([]*pendingNode, concurrency)
-	for nextRound(pendingNodes, concurrency, next) {
+	for nextRound(closestNodes, concurrency, next, n.K) {
 		rc := round(
 			trim(next),
 			client,
@@ -167,9 +172,9 @@ func (n *Node) Lookup(id gokad.ID) error {
 			cs.node.SetAnswered(true)
 			for _, c := range cs.payload {
 				distance := id.DistanceTo(c.ID)
-				if _, ok := pendingNodes.Get(distance); !ok {
+				if _, ok := closestNodes.Get(distance); !ok {
 					atLeastOneNewNode = true
-					pendingNodes.Insert(distance, &pendingNode{contact: c})
+					closestNodes.Insert(distance, &pendingNode{contact: c})
 				}
 				// contact details of any node that responded are attempted to be
 				// inserted into the dht
