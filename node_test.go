@@ -335,8 +335,8 @@ func TestNode_NewResolver(t *testing.T) {
 
 // Send 10,000 pings to node1 and see how it handles it
 func TestNode_Speed(t *testing.T) {
-	node1 := NewNode(gokad.NewDHT(), func(n *Node) {n.Port = 5001})
-	node2 := NewNode(gokad.NewDHT(), func(n *Node) {n.Port = 5002})
+	node1 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(gokad.NewDHT(), func(n *Node) { n.Port = 5002 })
 
 	go node1.Listen(nil)
 	go node2.Listen(nil)
@@ -344,10 +344,10 @@ func TestNode_Speed(t *testing.T) {
 
 	<-wait(node1, node2)
 
-	for i:=0; i < 10000; i++ {
+	for i := 0; i < 10000; i++ {
 		c := node2.NewClient()
 		res, err := c.Ping(gokad.Contact{
-			ID: node1.ID(),
+			ID:   node1.ID(),
 			IP:   net.ParseIP("127.0.0.1"),
 			Port: 5001,
 		})
@@ -360,6 +360,82 @@ func TestNode_Speed(t *testing.T) {
 		if _, err := res.Read(messages.Explicit()); err != nil {
 			t.Fatalf("Expected Read error for %d to be nil, but got %s\n", i, err)
 		}
+	}
+}
+
+func TestResolveWithMockNetwork(t *testing.T) {
+	dht1 := gokad.DHTFrom(gokad.DHTConfig{ID: gokad.GenerateID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1})})
+	dht2 := gokad.DHTFrom(gokad.DHTConfig{ID: gokad.GenerateID([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2})})
+	dht157 := gokad.DHTFrom(gokad.DHTConfig{ID: gokad.GenerateID([]byte{32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})})
+	dht158 := gokad.DHTFrom(gokad.DHTConfig{ID: gokad.GenerateID([]byte{64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})})
+	dht159 := gokad.DHTFrom(gokad.DHTConfig{ID: gokad.GenerateID([]byte{128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})})
+
+	node1 := NewNode(dht1, func(n *Node) { n.Port = 5001 })
+	node2 := NewNode(dht2, func(n *Node) { n.Port = 5002 })
+	node157 := NewNode(dht157, func(n *Node) { n.Port = 5003 })
+	node158 := NewNode(dht158, func(n *Node) { n.Port = 5004 })
+	node159 := NewNode(dht159, func(n *Node) { n.Port = 5005 })
+
+	go node1.Listen(nil)
+	go node2.Listen(nil)
+	go node157.Listen(nil)
+	go node158.Listen(nil)
+	go node159.Listen(nil)
+
+	defer shutdown(node1, node2, node157, node158, node159)
+
+	<-wait(node1, node2, node157, node158, node159)
+
+	// add node 157 - 159 to node1
+	node1.Seed(
+		gokad.Contact{
+			ID:   node157.ID(),
+			IP:   net.ParseIP(node157.Host),
+			Port: node157.Port,
+		},
+		gokad.Contact{
+			ID:   node158.ID(),
+			IP:   net.ParseIP(node158.Host),
+			Port: node158.Port,
+		},
+		gokad.Contact{
+			ID:   node159.ID(),
+			IP:   net.ParseIP(node159.Host),
+			Port: node159.Port,
+		},
+	)
+
+	// add node1 to node2
+	node2.Seed(gokad.Contact{
+		ID:   node1.ID(),
+		IP:   net.ParseIP(node1.Host),
+		Port: node1.Port,
+	})
+
+	key := make([]byte, 20)
+	key[0] = 128
+	ip := net.ParseIP("127.0.0.1")
+	port := 3000
+
+	_, err := node1.Store(gokad.ID(key).String(), ip, port)
+	if err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
+	}
+
+	time.Sleep(time.Millisecond * 200)
+
+	resolver, err := node2.NewResolver()
+	if err != nil {
+		t.Fatalf("Expected error to be nil, but got %s\n", err)
+	}
+
+	addr, err := resolver.Resolve(gokad.ID(key).String())
+	if err != nil {
+		t.Fatalf("Expected resolve error to be nil, but got %s\n", err)
+	}
+
+	if addr.String() != "127.0.0.1:3000" {
+		t.Fatalf("Expected address to be %s, but got %s\n", "127.0.0.1:3000", addr)
 	}
 }
 
