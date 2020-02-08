@@ -16,6 +16,7 @@ type Client struct {
 	NodeReplyBuffer  buffers.Buffer
 	PingReplyBuffer  buffers.Buffer
 	StoreReplyBuffer buffers.Buffer
+	ValueReplyBuffer buffers.Buffer
 }
 
 func (c *Client) FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.Response, error) {
@@ -54,7 +55,7 @@ func (c *Client) Ping(contact gokad.Contact) (*response.Response, error) {
 	req := request.New(contact, b)
 	c.do(req)
 
-	res := response.New(contact, "", c.PingReplyBuffer)
+	res := response.New(contact, ping.RandomID, c.PingReplyBuffer)
 	res.SendPingReplyFunc = c.implicitPingReplyFunc(req.Address())
 
 	return res, nil
@@ -79,6 +80,27 @@ func (c *Client) Store(contact gokad.Contact, key gokad.ID, value gokad.Value) (
 	c.do(req)
 
 	res := response.New(contact, "", c.StoreReplyBuffer)
+	res.SendPingReplyFunc = c.implicitPingReplyFunc(req.Address())
+
+	return res, nil
+}
+
+func (c *Client) FindValue(contact gokad.Contact, hash string) (*response.Response, error) {
+	fv := messages.FindValueRequest{
+		SenderID:     c.ID.String(),
+		Payload:      hash,
+		RandomID:     gokad.GenerateRandomID().String(),
+	}
+
+	b, err := fv.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	req := request.New(contact, b)
+	c.do(req)
+
+	res := response.New(contact, fv.RandomID, c.ValueReplyBuffer)
 	res.SendPingReplyFunc = c.implicitPingReplyFunc(req.Address())
 
 	return res, nil

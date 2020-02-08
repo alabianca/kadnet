@@ -36,7 +36,7 @@ func NewPingReplyBuffer() *PingReplyBuffer {
 		getMessage: make(chan pingReplyCheck),
 		getFirst:   make(chan chan messages.Message),
 		exit:       make(chan bool),
-		expiry:     time.Second * 5,
+		expiry:     time.Second * 50,
 	}
 
 	return &buf
@@ -142,13 +142,15 @@ func (b *PingReplyBuffer) accept() {
 		// store an expected pingReplyMessage by their echoRandomID
 		// with appropriate expiration
 		case m := <-b.expected:
+			sid, err := m.SenderID()
 			er, err := m.EchoRandomID()
 			if err != nil {
 				continue
 			}
 
 			now := time.Now()
-			buf[gokad.ID(er).String()] = expectedPingReply{
+			key := sid.String() + gokad.ID(er).String()
+			buf[key] = expectedPingReply{
 				expiry:  now.Add(b.expiry),
 				message: m,
 			}

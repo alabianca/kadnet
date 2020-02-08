@@ -29,8 +29,9 @@ const (
 	PingResExplicit = MessageType(24) // sent explicitly as a response to a PingRequest
 	FindValueReq    = MessageType(25)
 	FindValueRes    = MessageType(26)
-	StoreReq        = MessageType(27)
-	StoreRes        = MessageType(28)
+	FindValueResOK  = MessageType(27) // sent if the value is actually found from a FindValueReq
+	StoreReq        = MessageType(28)
+	StoreRes        = MessageType(29)
 	// Message Sizes
 	PingReqSize      = 41
 	PingResSize      = 41
@@ -83,12 +84,29 @@ func Process(raw []byte) (Message, error) {
 
 func ToKademliaMessage(msg Message, km KademliaMessage) {
 
+	mkey, _ := msg.MultiplexKey()
 	rid, _ := msg.RandomID()
 	eid, _ := msg.EchoRandomID()
 	sid, _ := msg.SenderID()
 	p, _ := msg.Payload()
 
 	switch v := km.(type) {
+	case *FindValueResponse:
+		if p, err := parseFindValueResponsePayload(mkey, p); err == nil {
+			*v = FindValueResponse{
+				mkey: mkey,
+				SenderID:     ToStringId(sid),
+				Payload:      p,
+				RandomID:     ToStringId(rid),
+				EchoRandomID: ToStringId(eid),
+			}
+		}
+	case *FindValueRequest:
+		*v = FindValueRequest{
+			SenderID:     ToStringId(sid),
+			Payload:      ToStringId(sid),
+			RandomID:     ToStringId(rid),
+		}
 	case *StoreResponse:
 		*v = StoreResponse{
 			SenderID:     ToStringId(sid),
@@ -213,6 +231,23 @@ func parseStoreRequestPayload(b []byte) (StoreRequestPayload, error) {
 	return StoreRequestPayload{Key: c.ID, Value: gokad.Value{Host: c.IP, Port: c.Port}}, nil
 }
 
+func parseFindValueResponsePayload(mkey MessageType, b []byte) (FindValueResponsePayload, error) {
+	var res FindValueResponsePayload
+	var err error
+
+	switch mkey {
+	case FindValueResOK:
+		res.Key = ToStringId(b[:20])
+		res.Contacts, err = processContacts(b[20:])
+	case FindValueRes:
+		res.Contacts, err = processContacts(b)
+	default:
+		err = errors.New(ErrInvalidMessage)
+	}
+
+	return res, err
+}
+
 func IsValid(msgType MessageType) bool {
 	return IsRequest(msgType) || IsResponse(msgType)
 }
@@ -220,6 +255,7 @@ func IsValid(msgType MessageType) bool {
 func IsResponse(msgType MessageType) bool {
 	return msgType == FindNodeRes ||
 		msgType == FindValueRes ||
+		msgType == FindValueResOK ||
 		msgType == StoreRes ||
 		msgType == PingResExplicit
 }

@@ -13,6 +13,7 @@ const HandlerNotFoundErr = "Handler Not Found"
 const NodeReplyBufferID = "NodeReplyBuffer"
 const PingReplyBufferID = "PingReplyBuffer"
 const StoreReplyBufferID = "StoreReplyBuffer"
+const ValueReplyBufferID = "ValueReplyBuffer"
 
 type Mux interface {
 	Handle(c kadconn.KadConn) error
@@ -59,6 +60,7 @@ func NewMux() Mux {
 			NodeReplyBufferID:  buffers.NewNodeReplyBuffer(),
 			PingReplyBufferID:  buffers.NewPingReplyBuffer(),
 			StoreReplyBufferID: buffers.NewStoreReplyBuffer(),
+			ValueReplyBufferID: buffers.NewNodeReplyBuffer(),
 		},
 	}
 }
@@ -100,9 +102,7 @@ func (k *kadMux) Handle(conn kadconn.KadConn) error {
 
 	// store the buffers in the reply thread so we can buffer incoming responses
 	// requests are not buffered and are handled by the dispatcher
-	for _, v := range k.buffers {
-		reply.SetBuffers(v)
-	}
+	reply.SetBuffers(k.buffers)
 
 	k.buffers[PingReplyBufferID].Open()
 

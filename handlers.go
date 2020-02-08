@@ -46,7 +46,7 @@ func onPingReplyImplicit(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandl
 			return
 		}
 
-		key := gokad.ID(id).String()
+		key := sid.String() + gokad.ID(id).String()
 		reader := buffer.NewReader(key)
 
 		var prm messages.PingResponse
@@ -54,7 +54,7 @@ func onPingReplyImplicit(proxy *dhtProxy, buffer buffers.Buffer) kadmux.RpcHandl
 			return
 		}
 
-		if prm.EchoRandomID != key || prm.SenderID != sid.String() {
+		if prm.SenderID + prm.EchoRandomID != key {
 			return
 		}
 
@@ -113,5 +113,42 @@ func onStoreRequest(myID gokad.ID, proxy *dhtProxy) kadmux.RpcHandlerFunc {
 
 		conn.Write(b, req.Address())
 
+	}
+}
+
+func onFindValue(proxy *dhtProxy) kadmux.RpcHandlerFunc {
+	return func(conn kadconn.KadWriter, req *request.Request) {
+		randomId, _ := req.Body.RandomID()
+		payload, _ := req.Body.Payload()
+
+		contacts, val := proxy.findValue(gokad.ID(payload))
+
+		var fvr *messages.FindValueResponse
+		if len(contacts) > 0 {
+			fvr = messages.FindValueResponseNOK()
+			fvr.Payload.Contacts = contacts
+		} else {
+			fvr = messages.FindValueResponseOK()
+			fvr.Payload.Contacts = []gokad.Contact{
+				{
+					ID: gokad.GenerateRandomID(), // just generate a random id here. We are not using it
+					IP:   val.Host,
+					Port: val.Port,
+				},
+			}
+			fvr.Payload.Key = gokad.ID(payload).String()
+		}
+
+		fvr.EchoRandomID = gokad.ID(randomId).String()
+		fvr.RandomID = gokad.GenerateRandomID().String()
+		fvr.SenderID = proxy.dht.ID.String()
+
+		b, err := fvr.Bytes()
+		if err != nil {
+			log.Printf("Error onFindValue %s\n", err)
+			return
+		}
+
+		conn.Write(b, req.Address())
 	}
 }

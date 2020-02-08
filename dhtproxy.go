@@ -49,6 +49,12 @@ func (proxy *dhtProxy) findNode(id gokad.ID) []gokad.Contact {
 	return proxy.dht.FindNode(id)
 }
 
+func (proxy *dhtProxy) findValue(key gokad.ID) ([]gokad.Contact, gokad.Value) {
+	proxy.mtx.Lock()
+	defer proxy.mtx.Unlock()
+	return proxy.dht.FindValue(key)
+}
+
 func (proxy *dhtProxy) walk(f func(bucketIndex int, c gokad.Contact)) {
 	routing := proxy.dht.RoutingTable()
 	for i := 0; i < gokad.MaxRoutingTableSize; i++ {

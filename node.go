@@ -16,7 +16,23 @@ import (
 )
 
 type RPC interface {
+	RpcFindNode
+	RpcPing
+	RpcStore
+	RpcFindValue
+}
+
+type RpcFindNode interface {
 	FindNode(contact gokad.Contact, lookupID gokad.ID) (*response.Response, error)
+}
+type RpcPing interface {
+	Ping(contact gokad.Contact) (*response.Response, error)
+}
+type RpcStore interface {
+	Store(contact gokad.Contact, key gokad.ID, value gokad.Value) (*response.Response, error)
+}
+type RpcFindValue interface {
+	FindValue(contact gokad.Contact, hash string) (*response.Response, error)
 }
 
 type NodeConfig func(*Node)
@@ -186,8 +202,9 @@ func (n *Node) Store(key string, ip net.IP, port int) (int, error) {
 func (n *Node) Lookup(id gokad.ID) ([]gokad.Contact, error) {
 	nodeLp, err := nodeLookup(func(l *lookup) {
 		l.dht = n.dht
-		l.nodeReplyBuffer = n.getBuffer(kadmux.NodeReplyBufferID)
+		l.buffer = n.getBuffer(kadmux.NodeReplyBufferID)
 		l.client = n.NewClient()
+		l.isNodeLookup = true
 	})
 	if err != nil {
 		return nil, err
@@ -201,13 +218,34 @@ func (n *Node) NewClient() *Client {
 	nodeReplyBuf, _ := n.getBuffer(kadmux.NodeReplyBufferID).(*buffers.NodeReplyBuffer)
 	pingReplyBuf, _ := n.getBuffer(kadmux.PingReplyBufferID).(*buffers.PingReplyBuffer)
 	storeReplyBuf, _ := n.getBuffer(kadmux.StoreReplyBufferID).(*buffers.StoreReplyBuffer)
+	valueReplyBuf, _ := n.getBuffer(kadmux.ValueReplyBufferID).(*buffers.NodeReplyBuffer)
 	return &Client{
 		ID:               n.dht.getOwnID(),
 		Writer:           n.conn,
 		NodeReplyBuffer:  nodeReplyBuf,
 		PingReplyBuffer:  pingReplyBuf,
 		StoreReplyBuffer: storeReplyBuf,
+		ValueReplyBuffer: valueReplyBuf,
 	}
+}
+
+func (n *Node) NewResolver() (*Resolver, error) {
+	lp, err := nodeLookup(func(l *lookup) {
+		l.dht = n.dht
+		l.buffer = n.getBuffer(kadmux.ValueReplyBufferID)
+		l.client = n.NewClient()
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	r := Resolver{
+		client: n.NewClient(),
+		lookup: lp,
+	}
+
+	return &r, nil
 }
 
 func (n *Node) getBuffer(key string) buffers.Buffer {
@@ -227,6 +265,7 @@ func (n *Node) registerRequestHandlers() {
 	n.mux.HandleFunc(messages.PingResImplicit, onPingReplyImplicit(n.dht, pingReplyBuffer))
 	n.mux.HandleFunc(messages.PingReq, onPingRequest(n.ID()))
 	n.mux.HandleFunc(messages.StoreReq, onStoreRequest(n.ID(), n.dht))
+	n.mux.HandleFunc(messages.FindValueReq, onFindValue(n.dht))
 }
 
 func (n *Node) listen() (kadconn.KadConn, error) {

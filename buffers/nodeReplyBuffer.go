@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const TimeoutErr = "timeout occured"
+const TimeoutErr = "timeout error"
 const ClosedBufferErr = "closed buffer error"
 
 type readQuery struct {
@@ -17,9 +17,9 @@ type readQuery struct {
 }
 
 type writeQuery struct {
-	reponse chan int
-	payload messages.Message
-	errc    chan error
+	response chan int
+	payload  messages.Message
+	errc     chan error
 }
 
 type readWritePair struct {
@@ -162,7 +162,7 @@ func (n *NodeReplyBuffer) acceptWrites(query <-chan writeQuery) {
 			msg.errc <- errors.New(ClosedBufferErr)
 		} else {
 			n.newMessage <- msg.payload
-			msg.reponse <- len(msg.payload)
+			msg.response <- len(msg.payload)
 		}
 	}
 }
@@ -225,15 +225,15 @@ type nodeReplyWriter struct {
 
 func (w *nodeReplyWriter) Write(msg messages.Message) (int, error) {
 	query := writeQuery{
-		payload: msg,
-		errc:    make(chan error, 1),
-		reponse: make(chan int, 1),
+		payload:  msg,
+		errc:     make(chan error, 1),
+		response: make(chan int, 1),
 	}
 
 	w.query <- query
 
 	select {
-	case n := <-query.reponse:
+	case n := <-query.response:
 		return n, nil
 	case err := <-query.errc:
 		return 0, err

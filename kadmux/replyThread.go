@@ -15,6 +15,7 @@ type ReplyThread struct {
 	nodeReplyBuffer  *buffers.NodeReplyBuffer
 	pingReplyBuffer  *buffers.PingReplyBuffer
 	storeReplyBuffer *buffers.StoreReplyBuffer
+	valueReplyBuffer *buffers.NodeReplyBuffer
 }
 
 func NewReplyThread(res chan messages.Message, req <-chan *request.Request, writer kadconn.KadWriter) *ReplyThread {
@@ -25,15 +26,17 @@ func NewReplyThread(res chan messages.Message, req <-chan *request.Request, writ
 	}
 }
 
-func (r *ReplyThread) SetBuffers(bf ...buffers.Buffer) {
-	for _, buf := range bf {
-		switch v := buf.(type) {
-		case *buffers.StoreReplyBuffer:
-			r.storeReplyBuffer = v
-		case *buffers.PingReplyBuffer:
-			r.pingReplyBuffer = v
-		case *buffers.NodeReplyBuffer:
-			r.nodeReplyBuffer = v
+func (r *ReplyThread) SetBuffers(b map[string]buffers.Buffer) {
+	for k, buf := range b {
+		switch k {
+		case ValueReplyBufferID:
+			r.valueReplyBuffer = buf.(*buffers.NodeReplyBuffer)
+		case PingReplyBufferID:
+			r.pingReplyBuffer = buf.(*buffers.PingReplyBuffer)
+		case StoreReplyBufferID:
+			r.storeReplyBuffer = buf.(*buffers.StoreReplyBuffer)
+		case NodeReplyBufferID:
+			r.nodeReplyBuffer = buf.(*buffers.NodeReplyBuffer)
 		}
 	}
 }
@@ -80,6 +83,8 @@ func (r *ReplyThread) tempStoreMsg(km messages.Message) {
 func (r *ReplyThread) getBuffer(key messages.MessageType) buffers.Buffer {
 	var buf buffers.Buffer
 	switch key {
+	case messages.FindValueResOK, messages.FindValueRes:
+		buf = r.valueReplyBuffer
 	case messages.StoreRes:
 		buf = r.storeReplyBuffer
 	case messages.PingResExplicit:

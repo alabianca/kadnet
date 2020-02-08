@@ -7,6 +7,7 @@ import (
 
 const (
 	ErrInvalidMessage = "invalid Message"
+	ErrDeserializeErr = "deserialize error"
 )
 
 type Message []byte
