@@ -336,8 +336,6 @@ func (v *findValueStrategy) send(node *pendingNode) chan findXResult {
 	return out
 }
 
-
-
 func getKClosestNodes(m *treeMap, K int) []gokad.Contact {
 	var index int
 	out := make([]gokad.Contact, 0)
@@ -419,62 +417,12 @@ func losers(in <-chan findXResult, mkey int) chan findXResult {
 	return out
 }
 
-//func round(nodes []*pendingNode, rpc RpcFindNode, lookupID gokad.ID, timeout time.Duration, timeouts chan<- findXResult) chan findXResult {
-//	out := make(chan findXResult)
-//	var wg sync.WaitGroup
-//	wg.Add(len(nodes))
-//
-//	for _, n := range nodes {
-//		go func(node *pendingNode) {
-//			defer wg.Done()
-//			res := <-sendFindNodeRPC(node, rpc, lookupID, timeout)
-//			if res.err != nil && res.err.Error() == buffers.TimeoutErr {
-//				timeouts <- res
-//			} else {
-//				out <- res
-//			}
-//		}(n)
-//	}
-//
-//	go func() {
-//		wg.Wait()
-//		close(out)
-//	}()
-//
-//	return out
-//}
 
-//func sendFindNodeRPC(node *pendingNode, rpc RpcFindNode, lookupID gokad.ID, timeout time.Duration) chan findXResult {
-//	out := make(chan findXResult)
-//	go func() {
-//		defer close(out)
-//		res, err := rpc.FindNode(node.Contact(), lookupID)
-//		if err != nil {
-//			out <- findXResult{node, nil, res, err}
-//			return
-//		}
-//
-//		res.ReadTimeout(timeout)
-//		read(node, res, out)
-//
-//	}()
-//
-//	return out
-//}
 
 func read(res *response.Response, km messages.KademliaMessage) error {
 	_, err := res.Read(km)
 	return err
 }
-
-//func read(node *pendingNode, res *response.Response, out chan<- findXResult) {
-//	var fnr messages.FindNodeResponse
-//	if _, err := res.Read(&fnr); err != nil {
-//		out <- findXResult{node, nil, res, err}
-//	} else {
-//		out <- findXResult{node, fnr.Payload, res, nil}
-//	}
-//}
 
 func mergeLosersAndRound(losers, round <-chan findXResult) chan findXResult {
 	out := make(chan findXResult)
